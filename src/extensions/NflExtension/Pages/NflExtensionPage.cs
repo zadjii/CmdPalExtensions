@@ -110,7 +110,7 @@ internal sealed partial class NflExtensionPage : ListPage, IDisposable
         var id = game.Id;
 
         Tag[] tags = [];
-        if (game.Situation != null)
+        if (game.Situation != null || e.Status.Type.Name == "STATUS_FINAL")
         {
             tags = game
                         .Competitors
@@ -119,7 +119,8 @@ internal sealed partial class NflExtensionPage : ListPage, IDisposable
                             {
                                 Icon = new IconDataType(c.Team.Id == game.Situation?.Possession ? "🏈" : string.Empty),
                                 Text = $"{c.Team.Abbreviation} {c.Score}",
-                                Color = HexToColor(c.Team.Color),
+                                Foreground = HexToColor(c.Team.AlternateColor),
+                                Background = HexToColor(c.Team.Color),
                             }).ToArray();
         }
 
@@ -157,8 +158,10 @@ internal sealed partial class NflExtensionPage : ListPage, IDisposable
             {
                 var driveChartPath = await FetchImage(game);
 
+                // var uri = new Uri(driveChartPath).AbsoluteUri;
                 var detailsBody = $"""
 ![Drivechart]({driveChartPath})
+![asdf](https://upload.wikimedia.org/wikipedia/commons/1/10/2023_Obsidian_logo.svg)
 
 {game.Situation.DownDistanceText}
 
@@ -198,7 +201,7 @@ internal sealed partial class NflExtensionPage : ListPage, IDisposable
             {
                 // Extract the inner HTML content
                 var svgContent = driveChartElement.InnerHtml;
-                svgContent = $"<svg xmlns=\"http://www.w3.org/2000/svg\">{{svgContent}}</svg>";
+                svgContent = $"<?xml version=\"1.0\" encoding=\"UTF-8\"?><svg xmlns=\"http://www.w3.org/2000/svg\" fill=\"none\" height=\"100%\" width=\"100%\" viewBox=\"0 0 512 512\">{svgContent}</svg>";
 
                 // Save the content as an SVG file
                 File.WriteAllText(svgOutputPath, svgContent);
@@ -313,18 +316,21 @@ internal sealed partial class NflExtensionPage : ListPage, IDisposable
 }
 
 [System.Diagnostics.CodeAnalysis.SuppressMessage("StyleCop.CSharp.MaintainabilityRules", "SA1402:File may only contain a single type", Justification = "This is sample code")]
-public sealed partial class NflGameCommand : OpenUrlCommand
+public sealed partial class NflGameCommand : InvokableCommand
 {
+    private readonly OpenUrlCommand _command;
+
     public Competition Game { get; init; }
 
     public string GameUrl => $"https://www.espn.com/nfl/game/_/gameId/{Game.Id}";
 
     public NflGameCommand(Competition game)
-        : base($"https://www.espn.com/nfl/game/_/gameId/{game.Id}")
     {
+        _command = new OpenUrlCommand($"https://www.espn.com/nfl/game/_/gameId/{game.Id}") { Name = "View on ESPN" };
         Game = game;
-        Name = "View on ESPN";
     }
+
+    public override ICommandResult Invoke() => _command.Invoke();
 }
 
 [System.Diagnostics.CodeAnalysis.SuppressMessage("StyleCop.CSharp.MaintainabilityRules", "SA1402:File may only contain a single type", Justification = "This is sample code")]
