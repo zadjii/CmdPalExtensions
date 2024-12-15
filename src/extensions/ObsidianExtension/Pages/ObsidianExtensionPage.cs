@@ -6,6 +6,8 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Text.Json;
+using System.Text.Json.Nodes;
 using Microsoft.CmdPal.Extensions;
 using Microsoft.CmdPal.Extensions.Helpers;
 
@@ -33,12 +35,21 @@ internal sealed partial class ObsidianExtensionPage : ListPage
 
         var listItems = notes.Select(n =>
         {
-            var obsidianUri = $"obsidian://open?vault={vaultName}&file={Uri.EscapeDataString(n.RelativePath)}";
-            return new ListItem(new OpenUrlCommand(obsidianUri))
+            var openNote = new OpenUrlCommand(n.ObsidianProtocolUri)
             {
-                Icon = new("\uE70B"),
+                Name = "Open",
+            };
+
+            var previewNote = new PreviewNotePage(n);
+
+            return new ListItem(previewNote)
+            {
                 Title = n.Name,
                 Subtitle = $"{n.Folder}/",
+                MoreCommands = [
+                    new CommandContextItem(openNote),
+                    new CommandContextItem(new EditNotePage(n)),
+                ],
             };
         });
         return listItems.ToArray();
@@ -56,20 +67,12 @@ internal sealed partial class ObsidianExtensionPage : ListPage
             foreach (var noteFile in noteFiles)
             {
                 // Display the note name without the full path or file extension
-                var noteName = Path.GetFileNameWithoutExtension(noteFile);
-                var folderPath = Path.GetDirectoryName(noteFile[vaultPath.Length..].TrimStart('\\', '/'));
-                var relativePath = Path.GetRelativePath(vaultPath, noteFile);
                 notes.Add(new Note()
                 {
-                    Name = noteName,
-                    Folder = folderPath,
-                    RelativePath = relativePath,
+                    VaultPath = vaultPath,
+                    AbsolutePath = Path.GetFullPath(noteFile),
                 });
-
-                // Console.WriteLine(noteName);
             }
-
-            // Console.WriteLine($"\nTotal notes found: {noteFiles.Length}");
         }
 
         return notes;
@@ -77,11 +80,131 @@ internal sealed partial class ObsidianExtensionPage : ListPage
 }
 
 [System.Diagnostics.CodeAnalysis.SuppressMessage("StyleCop.CSharp.MaintainabilityRules", "SA1402:File may only contain a single type", Justification = "Sample code")]
+public partial class PreviewNotePage : MarkdownPage
+{
+    private readonly Note _note;
+
+    public PreviewNotePage(Note note)
+    {
+        _note = note;
+        Name = "Preview";
+        Title = _note.Name;
+        Icon = new("\uE70B");
+    }
+
+    public override string[] Bodies()
+    {
+        var content = _note.NoteContent();
+        return content == null ? [] : [content];
+    }
+}
+
+[System.Diagnostics.CodeAnalysis.SuppressMessage("StyleCop.CSharp.MaintainabilityRules", "SA1402:File may only contain a single type", Justification = "Sample code")]
+public partial class EditNotePage : FormPage
+{
+    private readonly Note _note;
+
+    public EditNotePage(Note note)
+    {
+        _note = note;
+        Name = "Quick edit";
+        Title = _note.Name;
+        Icon = new("\uE70B");
+    }
+
+    public override IForm[] Forms() => [new EditNoteForm(_note)];
+}
+
+[System.Diagnostics.CodeAnalysis.SuppressMessage("StyleCop.CSharp.MaintainabilityRules", "SA1402:File may only contain a single type", Justification = "Sample code")]
+public partial class EditNoteForm : Form
+{
+    private readonly Note _note;
+
+    public EditNoteForm(Note note)
+    {
+        _note = note;
+        Data = $$"""
+{
+    "fileContent": {{JsonSerializer.Serialize(_note.NoteContent())}}
+}
+""";
+
+        Template = $$"""
+{
+    "$schema": "http://adaptivecards.io/schemas/adaptive-card.json",
+    "type": "AdaptiveCard",
+    "version": "1.6",
+    "body": [
+        {
+            "type": "Input.Text",
+            "id": "Content",
+            "label": "",
+            "isMultiline": true,
+            "value": "${fileContent}"
+        }
+    ],
+    "actions": [
+        {
+            "type": "Action.Submit",
+            "title": "Save",
+            "data": {
+                "id": "Content"
+            }
+        }
+    ]
+}
+        
+"""
+        ;
+    }
+
+    public override ICommandResult SubmitForm(string payload)
+    {
+        var formInput = JsonNode.Parse(payload)?.AsObject();
+        if (formInput == null)
+        {
+            return CommandResult.KeepOpen();
+        }
+
+        var fileContent = formInput["Content"];
+        if (fileContent != null)
+        {
+            var data = fileContent.ToString();
+            File.WriteAllText(_note.AbsolutePath, data);
+        }
+
+        return CommandResult.KeepOpen();
+    }
+}
+
+[System.Diagnostics.CodeAnalysis.SuppressMessage("StyleCop.CSharp.MaintainabilityRules", "SA1402:File may only contain a single type", Justification = "Sample code")]
 public sealed class Note
 {
-    public string Name { get; set; } = string.Empty;
+    public string VaultPath { get; set; } = string.Empty;
 
-    public string Folder { get; set; } = string.Empty;
+    public string VaultName => Path.GetFileName(VaultPath);
 
-    public string RelativePath { get; set; } = string.Empty;
+    public string AbsolutePath { get; set; } = string.Empty;
+
+    public string Name => Path.GetFileNameWithoutExtension(AbsolutePath);
+
+    public string Folder => Path.GetDirectoryName(AbsolutePath[VaultPath.Length..].TrimStart('\\', '/'));
+
+    public string RelativePath => Path.GetRelativePath(VaultPath, AbsolutePath);
+
+    public string ObsidianProtocolUri => $"obsidian://open?vault={VaultName}&file={Uri.EscapeDataString(RelativePath)}";
+
+    public string NoteContent()
+    {
+        try
+        {
+            var content = File.ReadAllText(AbsolutePath);
+            return content;
+        }
+        catch
+        {
+        }
+
+        return null;
+    }
 }
