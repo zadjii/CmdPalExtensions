@@ -4,8 +4,6 @@
 
 using System;
 using System.Collections.Generic;
-using System.Diagnostics;
-using System.Drawing.Imaging;
 using System.Globalization;
 using System.Linq;
 using System.Net.Http;
@@ -13,33 +11,17 @@ using System.Text.Json;
 using System.Text.Json.Serialization;
 using System.Threading.Tasks;
 using System.Timers;
-using HtmlAgilityPack;
 using Microsoft.CmdPal.Extensions;
 using Microsoft.CmdPal.Extensions.Helpers;
-using PuppeteerSharp;
-using Svg;
 
 namespace NflExtension;
 
 internal sealed partial class NflExtensionPage : ListPage, IDisposable
 {
-    private static readonly BrowserFetcher _browserFetcher = new();
-    private static IBrowser _browser;
-
     internal static readonly HttpClient Client = new();
     internal static readonly JsonSerializerOptions Options = new() { PropertyNameCaseInsensitive = true };
     private Timer _timer;
     private List<ListItem> _lastItems;
-
-    static NflExtensionPage()
-    {
-        // Download Chromium browser for Puppeteer Sharp
-        _ = Task.Run(async () =>
-        {
-            await _browserFetcher.DownloadAsync().ConfigureAwait(false);
-            _browser = await Puppeteer.LaunchAsync(new LaunchOptions { Headless = true });
-        });
-    }
 
     public NflExtensionPage()
     {
@@ -171,21 +153,16 @@ internal sealed partial class NflExtensionPage : ListPage, IDisposable
             IDetails details = null;
             if (game.Situation != null)
             {
-                // var driveChartPath = await FetchImage(game);
-
-                // var uri = new Uri(driveChartPath).AbsoluteUri;
                 var detailsBody = $"""
 {game.Situation.DownDistanceText}
 
 {game.Situation.LastPlay.Text}
 """;
 
-                details = new GameDetails(game)
+                details = new Details()
                 {
                     Title = string.Join("-", game.Competitors.Select(c => $"{c.Team.Abbreviation} {c.Score}")),
                     Body = detailsBody,
-
-                    // HeroImage = new(driveChartPath),
                 };
             }
 
@@ -193,202 +170,6 @@ internal sealed partial class NflExtensionPage : ListPage, IDisposable
         }
     }
 
-    public static async Task<string> FetchImage(Competition game)
-    {
-        var url = $"https://www.espn.com/nfl/game/_/gameId/{game.Id}";
-        var rand = new Random().Next(int.MaxValue);
-        var svgOutputPath = $"Assets/games/{game.Id}_{rand}.svg";
-        var pngOutputPath = $"Assets/games/{game.Id}_{rand}.png";
-        var externalCssUrl = "https://cdn1.espn.net/fitt/5c11ba92527d-release-12-11-2024.2.0.1772/client/espnfitt/css/3246-55ffc5e5.css";
-
-        _ = System.IO.Path.Combine(AppDomain.CurrentDomain.BaseDirectory.ToString(), svgOutputPath);
-        pngOutputPath = System.IO.Path.Combine(AppDomain.CurrentDomain.BaseDirectory.ToString(), pngOutputPath);
-        System.IO.Directory.CreateDirectory(System.IO.Path.Combine(AppDomain.CurrentDomain.BaseDirectory.ToString(), "Assets/games"));
-        try
-        {
-            // Create an HttpClient to retrieve the webpage
-            using var httpClient = new HttpClient();
-            var response = await httpClient.GetStringAsync(url);
-
-            // Download the external CSS file
-            var cssResponse = await httpClient.GetStringAsync(externalCssUrl);
-
-            // Load the response into an HtmlDocument
-            var htmlDocument = new HtmlDocument();
-            htmlDocument.LoadHtml(response);
-
-            // Select the #drivechart element
-            var driveChartElement = htmlDocument.DocumentNode.SelectSingleNode("//*[@id='drivechart']");
-
-            if (driveChartElement != null)
-            {
-                var svg = await FetchSvg(game);
-                if (!string.IsNullOrEmpty(svg))
-                {
-                    svg = svg.Replace("xlink:href", "href");
-                    var svgDocument = SvgDocument.FromSvg<SvgDocument>(svg);
-                    var bitmap = svgDocument.Draw();
-                    bitmap.Save(pngOutputPath, ImageFormat.Png);
-                    return System.IO.Path.GetFullPath(pngOutputPath);
-                }
-
-                return string.Empty;
-
-                // // Extract the inner HTML content
-                //                var inner = driveChartElement.InnerHtml;
-
-                // // svgContent = $"<?xml version=\"1.0\" encoding=\"UTF-8\"?><svg xmlns=\"http://www.w3.org/2000/svg\" fill=\"none\" height=\"100%\" width=\"100%\" viewBox=\"0 0 512 512\">{svgContent}</svg>";
-
-                // // Wrap the SVG content and include the downloaded CSS styles
-                //                inner = inner.Replace("xlink:href", "href");
-                //                var svgWithStyles = $@"
-                // <svg xmlns=""http://www.w3.org/2000/svg"" xmlns:xlink=""http://www.w3.org/1999/xlink"">
-                //    <style>
-                //        {cssResponse}
-                //    </style>
-                //    {inner}
-                // </svg>";
-
-                // var outer = driveChartElement.OuterHtml;
-                //                var viewboxString = driveChartElement.Attributes["viewbox"].Value ?? "0 0 512 512";
-                //                var viewboxElements = viewboxString.Split(" ");
-
-                // outer = outer.Replace("xlink:href", "href");
-                //                var svgDocument = SvgDocument.FromSvg<SvgDocument>(svgWithStyles);
-
-                // svgDocument.ViewBox = new SvgViewBox(
-                //                     float.Parse(viewboxElements[0], NumberStyles.AllowLeadingSign, CultureInfo.InvariantCulture),
-                //                     float.Parse(viewboxElements[1], NumberStyles.AllowLeadingSign, CultureInfo.InvariantCulture),
-                //                     float.Parse(viewboxElements[2], NumberStyles.AllowLeadingSign, CultureInfo.InvariantCulture),
-                //                     float.Parse(viewboxElements[3], NumberStyles.AllowLeadingSign, CultureInfo.InvariantCulture));
-
-                // var bitmap = svgDocument.Draw();
-                //                bitmap.Save(pngOutputPath, ImageFormat.Png);
-
-                // //// Save the content as an SVG file
-                //                System.IO.File.WriteAllText(svgOutputPath, svgWithStyles);
-
-                // // Debug.WriteLine($"SVG saved successfully to {svgOutputPath}");
-                //                // return Path.GetFullPath(svgOutputPath);
-                // return System.IO.Path.GetFullPath(pngOutputPath);
-            }
-            else
-            {
-                Debug.WriteLine("The #drivechart element was not found on the page.");
-            }
-        }
-        catch (System.Exception)
-        {
-            // Console.WriteLine($"An error occurred: {ex.Message}");
-        }
-
-        return string.Empty;
-    }
-
-    private static async Task<string> FetchSvg(Competition game)
-    {
-        var url = $"https://www.espn.com/nfl/game/_/gameId/{game.Id}";
-        if (_browser == null)
-        {
-            return string.Empty;
-        }
-
-        // Launch a headless browser
-        using var page = await _browser.NewPageAsync();
-
-        // Navigate to the URL
-        await page.GoToAsync(url, WaitUntilNavigation.Networkidle2);
-
-        // Wait for the #drivechart element to load
-        await page.WaitForSelectorAsync("#drivechart");
-
-        // Extract the #drivechart element with computed styles inlined
-        var svgContent = await page.EvaluateFunctionAsync<string>(@"() => {
-            const element = document.querySelector('#drivechart');
-            if (!element) return null;
-
-            // Clone the element to include styles
-            const clonedElement = element.cloneNode(true);
-
-            // Get computed styles and inline them
-            const allElements = clonedElement.querySelectorAll('*');
-            for (const el of allElements) {
-                const computed = getComputedStyle(el);
-                for (const key of computed) {
-                    el.style[key] = computed[key];
-                }
-            }
-
-            // Return the outer HTML with inlined styles
-            return clonedElement.outerHTML;
-        }");
-
-        //// Save the styled SVG to a file
-        // if (!string.IsNullOrEmpty(svgContent))
-        // {
-        //    await File.WriteAllTextAsync(outputPath, svgContent);
-        //    Console.WriteLine($"Final styled SVG saved to {outputPath}");
-        // }
-        // else
-        // {
-        //    Console.WriteLine("The #drivechart element was not found or could not be extracted.");
-        // }
-
-        //// Close the browser
-        // await browser.CloseAsync();
-        return svgContent;
-    }
-
-    // private static async Task<string> FetchSvg(Competition game)
-    // {
-    //    var url = $"https://www.espn.com/nfl/game/_/gameId/{game.Id}";
-
-    // // Launch a headless browser using Playwright
-    //    using var playwright = await Playwright.CreateAsync();
-    //    await using var browser = await playwright.LaunchAsync(new BrowserTypeLaunchOptions { Headless = true });
-    //    var context = await browser.NewContextAsync();
-    //    var page = await context.NewPageAsync();
-
-    // // Navigate to the page
-    //    await page.GotoAsync(url);
-
-    // // Wait for the #drivechart element to load (optional delay in case of JavaScript rendering)
-    //    await page.WaitForSelectorAsync("#drivechart");
-
-    // // Extract the outer HTML of the #drivechart SVG element with all computed styles applied
-    //    var svgContent = await page.EvaluateAsync<string>(@"
-    //        () => {
-    //            const element = document.querySelector('#drivechart');
-    //            if (!element) return null;
-
-    // // Clone the element to include styles
-    //            const clonedElement = element.cloneNode(true);
-
-    // // Get computed styles and inline them
-    //            const allElements = clonedElement.querySelectorAll('*');
-    //            const computedStyle = getComputedStyle(clonedElement);
-    //            for (const el of allElements) {
-    //                const computed = getComputedStyle(el);
-    //                for (const key of computed) {
-    //                    el.style[key] = computed[key];
-    //                }
-    //            }
-    //            // Return the outer HTML with inlined styles
-    //            return clonedElement.outerHTML;
-    //        }
-    //    ");
-
-    // if (!string.IsNullOrEmpty(svgContent))
-    //    {
-    //        return svgContent;
-    //    }
-    //    else
-    //    {
-    //        Console.WriteLine("The #drivechart element was not found or could not be extracted.");
-    //    }
-
-    // return string.Empty;
-    // }
     private static OptionalColor HexToColor(string hex)
     {
         // Ensure the string has the correct length
@@ -480,92 +261,6 @@ internal sealed partial class NflExtensionPage : ListPage, IDisposable
     }
 
     public void Dispose() => throw new NotImplementedException();
-}
-
-[System.Diagnostics.CodeAnalysis.SuppressMessage("StyleCop.CSharp.MaintainabilityRules", "SA1402:File may only contain a single type", Justification = "This is sample code")]
-public partial class MuhDetails : BaseObservable, IDetails
-{
-    private IconDataType _heroImage = new(string.Empty);
-    private string _title = string.Empty;
-    private string _body = string.Empty;
-    private IDetailsElement[] _metadata = [];
-
-    public virtual IconDataType HeroImage
-    {
-        get => _heroImage;
-        set
-        {
-            _heroImage = value;
-            OnPropertyChanged(nameof(HeroImage));
-        }
-    }
-
-    public string Title
-    {
-        get => _title;
-        set
-        {
-            _title = value;
-            OnPropertyChanged(nameof(Title));
-        }
-    }
-
-    public string Body
-    {
-        get => _body;
-        set
-        {
-            _body = value;
-            OnPropertyChanged(nameof(Body));
-        }
-    }
-
-    public IDetailsElement[] Metadata
-    {
-        get => _metadata;
-        set
-        {
-            _metadata = value;
-            OnPropertyChanged(nameof(Metadata));
-        }
-    }
-}
-
-[System.Diagnostics.CodeAnalysis.SuppressMessage("StyleCop.CSharp.MaintainabilityRules", "SA1402:File may only contain a single type", Justification = "This is sample code")]
-public partial class GameDetails : MuhDetails
-{
-    private readonly Competition _game;
-    private bool fetchedIcon;
-
-    public GameDetails(Competition game)
-    {
-        _game = game;
-    }
-
-    public override IconDataType HeroImage
-    {
-        get
-        {
-            if (fetchedIcon)
-            {
-                return base.HeroImage;
-            }
-            else
-            {
-                _ = Task.Run(() =>
-                {
-                    var t = NflExtensionPage.FetchImage(_game);
-                    t.ConfigureAwait(false);
-                    base.HeroImage = new(t.Result);
-                });
-                fetchedIcon = true;
-            }
-
-            return base.HeroImage;
-        }
-
-        set => base.HeroImage = value;
-    }
 }
 
 [System.Diagnostics.CodeAnalysis.SuppressMessage("StyleCop.CSharp.MaintainabilityRules", "SA1402:File may only contain a single type", Justification = "This is sample code")]
