@@ -16,12 +16,15 @@ using System.Timers;
 using HtmlAgilityPack;
 using Microsoft.CmdPal.Extensions;
 using Microsoft.CmdPal.Extensions.Helpers;
+using PuppeteerSharp;
 using Svg;
 
 namespace NflExtension;
 
 internal sealed partial class NflExtensionPage : ListPage, IDisposable
 {
+    private readonly BrowserFetcher _browserFetcher = new();
+
     internal static readonly HttpClient Client = new();
     internal static readonly JsonSerializerOptions Options = new() { PropertyNameCaseInsensitive = true };
     private Timer _timer;
@@ -33,6 +36,9 @@ internal sealed partial class NflExtensionPage : ListPage, IDisposable
         Name = "NFL Scores";
         ShowDetails = true;
         IsLoading = true;
+
+        // Download Chromium browser for Puppeteer Sharp
+        _browserFetcher.DownloadAsync().ConfigureAwait(false);
     }
 
     public override IListItem[] GetItems()
@@ -188,7 +194,7 @@ internal sealed partial class NflExtensionPage : ListPage, IDisposable
         var pngOutputPath = $"Assets/games/{game.Id}_{rand}.png";
         var externalCssUrl = "https://cdn1.espn.net/fitt/5c11ba92527d-release-12-11-2024.2.0.1772/client/espnfitt/css/3246-55ffc5e5.css";
 
-        svgOutputPath = System.IO.Path.Combine(AppDomain.CurrentDomain.BaseDirectory.ToString(), svgOutputPath);
+        _ = System.IO.Path.Combine(AppDomain.CurrentDomain.BaseDirectory.ToString(), svgOutputPath);
         pngOutputPath = System.IO.Path.Combine(AppDomain.CurrentDomain.BaseDirectory.ToString(), pngOutputPath);
         System.IO.Directory.CreateDirectory(System.IO.Path.Combine(AppDomain.CurrentDomain.BaseDirectory.ToString(), "Assets/games"));
         try
@@ -209,43 +215,55 @@ internal sealed partial class NflExtensionPage : ListPage, IDisposable
 
             if (driveChartElement != null)
             {
-                // Extract the inner HTML content
-                var inner = driveChartElement.InnerHtml;
+                var svg = await FetchSvg(game);
+                if (!string.IsNullOrEmpty(svg))
+                {
+                    svg = svg.Replace("xlink:href", "href");
+                    var svgDocument = SvgDocument.FromSvg<SvgDocument>(svg);
+                    var bitmap = svgDocument.Draw();
+                    bitmap.Save(pngOutputPath, ImageFormat.Png);
+                    return System.IO.Path.GetFullPath(pngOutputPath);
+                }
 
-                // svgContent = $"<?xml version=\"1.0\" encoding=\"UTF-8\"?><svg xmlns=\"http://www.w3.org/2000/svg\" fill=\"none\" height=\"100%\" width=\"100%\" viewBox=\"0 0 512 512\">{svgContent}</svg>";
+                return string.Empty;
 
-                // Wrap the SVG content and include the downloaded CSS styles
-                inner = inner.Replace("xlink:href", "href");
-                var svgWithStyles = $@"
-<svg xmlns=""http://www.w3.org/2000/svg"" xmlns:xlink=""http://www.w3.org/1999/xlink"">
-    <style>
-        {cssResponse}
-    </style>
-    {inner}
-</svg>";
+                // // Extract the inner HTML content
+                //                var inner = driveChartElement.InnerHtml;
 
-                var outer = driveChartElement.OuterHtml;
-                var viewboxString = driveChartElement.Attributes["viewbox"].Value ?? "0 0 512 512";
-                var viewboxElements = viewboxString.Split(" ");
+                // // svgContent = $"<?xml version=\"1.0\" encoding=\"UTF-8\"?><svg xmlns=\"http://www.w3.org/2000/svg\" fill=\"none\" height=\"100%\" width=\"100%\" viewBox=\"0 0 512 512\">{svgContent}</svg>";
 
-                outer = outer.Replace("xlink:href", "href");
-                var svgDocument = SvgDocument.FromSvg<SvgDocument>(svgWithStyles);
+                // // Wrap the SVG content and include the downloaded CSS styles
+                //                inner = inner.Replace("xlink:href", "href");
+                //                var svgWithStyles = $@"
+                // <svg xmlns=""http://www.w3.org/2000/svg"" xmlns:xlink=""http://www.w3.org/1999/xlink"">
+                //    <style>
+                //        {cssResponse}
+                //    </style>
+                //    {inner}
+                // </svg>";
 
-                svgDocument.ViewBox = new SvgViewBox(
-                     float.Parse(viewboxElements[0], NumberStyles.AllowLeadingSign, CultureInfo.InvariantCulture),
-                     float.Parse(viewboxElements[1], NumberStyles.AllowLeadingSign, CultureInfo.InvariantCulture),
-                     float.Parse(viewboxElements[2], NumberStyles.AllowLeadingSign, CultureInfo.InvariantCulture),
-                     float.Parse(viewboxElements[3], NumberStyles.AllowLeadingSign, CultureInfo.InvariantCulture));
+                // var outer = driveChartElement.OuterHtml;
+                //                var viewboxString = driveChartElement.Attributes["viewbox"].Value ?? "0 0 512 512";
+                //                var viewboxElements = viewboxString.Split(" ");
 
-                var bitmap = svgDocument.Draw();
-                bitmap.Save(pngOutputPath, ImageFormat.Png);
+                // outer = outer.Replace("xlink:href", "href");
+                //                var svgDocument = SvgDocument.FromSvg<SvgDocument>(svgWithStyles);
 
-                //// Save the content as an SVG file
-                System.IO.File.WriteAllText(svgOutputPath, svgWithStyles);
+                // svgDocument.ViewBox = new SvgViewBox(
+                //                     float.Parse(viewboxElements[0], NumberStyles.AllowLeadingSign, CultureInfo.InvariantCulture),
+                //                     float.Parse(viewboxElements[1], NumberStyles.AllowLeadingSign, CultureInfo.InvariantCulture),
+                //                     float.Parse(viewboxElements[2], NumberStyles.AllowLeadingSign, CultureInfo.InvariantCulture),
+                //                     float.Parse(viewboxElements[3], NumberStyles.AllowLeadingSign, CultureInfo.InvariantCulture));
 
-                // Debug.WriteLine($"SVG saved successfully to {svgOutputPath}");
-                // return Path.GetFullPath(svgOutputPath);
-                return System.IO.Path.GetFullPath(pngOutputPath);
+                // var bitmap = svgDocument.Draw();
+                //                bitmap.Save(pngOutputPath, ImageFormat.Png);
+
+                // //// Save the content as an SVG file
+                //                System.IO.File.WriteAllText(svgOutputPath, svgWithStyles);
+
+                // // Debug.WriteLine($"SVG saved successfully to {svgOutputPath}");
+                //                // return Path.GetFullPath(svgOutputPath);
+                // return System.IO.Path.GetFullPath(pngOutputPath);
             }
             else
             {
@@ -260,6 +278,108 @@ internal sealed partial class NflExtensionPage : ListPage, IDisposable
         return string.Empty;
     }
 
+    private static async Task<string> FetchSvg(Competition game)
+    {
+        var url = $"https://www.espn.com/nfl/game/_/gameId/{game.Id}";
+
+        // Launch a headless browser
+        using var browser = await Puppeteer.LaunchAsync(new LaunchOptions { Headless = true });
+        using var page = await browser.NewPageAsync();
+
+        // Navigate to the URL
+        await page.GoToAsync(url, WaitUntilNavigation.Networkidle2);
+
+        // Wait for the #drivechart element to load
+        await page.WaitForSelectorAsync("#drivechart");
+
+        // Extract the #drivechart element with computed styles inlined
+        var svgContent = await page.EvaluateFunctionAsync<string>(@"() => {
+            const element = document.querySelector('#drivechart');
+            if (!element) return null;
+
+            // Clone the element to include styles
+            const clonedElement = element.cloneNode(true);
+
+            // Get computed styles and inline them
+            const allElements = clonedElement.querySelectorAll('*');
+            for (const el of allElements) {
+                const computed = getComputedStyle(el);
+                for (const key of computed) {
+                    el.style[key] = computed[key];
+                }
+            }
+
+            // Return the outer HTML with inlined styles
+            return clonedElement.outerHTML;
+        }");
+
+        //// Save the styled SVG to a file
+        // if (!string.IsNullOrEmpty(svgContent))
+        // {
+        //    await File.WriteAllTextAsync(outputPath, svgContent);
+        //    Console.WriteLine($"Final styled SVG saved to {outputPath}");
+        // }
+        // else
+        // {
+        //    Console.WriteLine("The #drivechart element was not found or could not be extracted.");
+        // }
+
+        // Close the browser
+        await browser.CloseAsync();
+
+        return svgContent;
+    }
+
+    // private static async Task<string> FetchSvg(Competition game)
+    // {
+    //    var url = $"https://www.espn.com/nfl/game/_/gameId/{game.Id}";
+
+    // // Launch a headless browser using Playwright
+    //    using var playwright = await Playwright.CreateAsync();
+    //    await using var browser = await playwright.LaunchAsync(new BrowserTypeLaunchOptions { Headless = true });
+    //    var context = await browser.NewContextAsync();
+    //    var page = await context.NewPageAsync();
+
+    // // Navigate to the page
+    //    await page.GotoAsync(url);
+
+    // // Wait for the #drivechart element to load (optional delay in case of JavaScript rendering)
+    //    await page.WaitForSelectorAsync("#drivechart");
+
+    // // Extract the outer HTML of the #drivechart SVG element with all computed styles applied
+    //    var svgContent = await page.EvaluateAsync<string>(@"
+    //        () => {
+    //            const element = document.querySelector('#drivechart');
+    //            if (!element) return null;
+
+    // // Clone the element to include styles
+    //            const clonedElement = element.cloneNode(true);
+
+    // // Get computed styles and inline them
+    //            const allElements = clonedElement.querySelectorAll('*');
+    //            const computedStyle = getComputedStyle(clonedElement);
+    //            for (const el of allElements) {
+    //                const computed = getComputedStyle(el);
+    //                for (const key of computed) {
+    //                    el.style[key] = computed[key];
+    //                }
+    //            }
+    //            // Return the outer HTML with inlined styles
+    //            return clonedElement.outerHTML;
+    //        }
+    //    ");
+
+    // if (!string.IsNullOrEmpty(svgContent))
+    //    {
+    //        return svgContent;
+    //    }
+    //    else
+    //    {
+    //        Console.WriteLine("The #drivechart element was not found or could not be extracted.");
+    //    }
+
+    // return string.Empty;
+    // }
     private static OptionalColor HexToColor(string hex)
     {
         // Ensure the string has the correct length
