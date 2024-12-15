@@ -23,12 +23,23 @@ namespace NflExtension;
 
 internal sealed partial class NflExtensionPage : ListPage, IDisposable
 {
-    private readonly BrowserFetcher _browserFetcher = new();
+    private static readonly BrowserFetcher _browserFetcher = new();
+    private static IBrowser _browser;
 
     internal static readonly HttpClient Client = new();
     internal static readonly JsonSerializerOptions Options = new() { PropertyNameCaseInsensitive = true };
     private Timer _timer;
     private List<ListItem> _lastItems;
+
+    static NflExtensionPage()
+    {
+        // Download Chromium browser for Puppeteer Sharp
+        _ = Task.Run(async () =>
+        {
+            await _browserFetcher.DownloadAsync().ConfigureAwait(false);
+            _browser = await Puppeteer.LaunchAsync(new LaunchOptions { Headless = true });
+        });
+    }
 
     public NflExtensionPage()
     {
@@ -36,9 +47,6 @@ internal sealed partial class NflExtensionPage : ListPage, IDisposable
         Name = "NFL Scores";
         ShowDetails = true;
         IsLoading = true;
-
-        // Download Chromium browser for Puppeteer Sharp
-        _browserFetcher.DownloadAsync().ConfigureAwait(false);
     }
 
     public override IListItem[] GetItems()
@@ -108,7 +116,7 @@ internal sealed partial class NflExtensionPage : ListPage, IDisposable
         return list;
     }
 
-    private async Task<ListItem> EventNodeToItemAsync(NflEvent e)
+    private ListItem EventNodeToItem(NflEvent e)
     {
         var name = e.Name;
         var game = e
@@ -131,7 +139,7 @@ internal sealed partial class NflExtensionPage : ListPage, IDisposable
                             }).ToArray();
         }
 
-        var details = await BuildDetails(game);
+        var details = BuildDetails(game);
 
         // Icon
         var icon = new IconDataType(string.Empty);
@@ -158,27 +166,26 @@ internal sealed partial class NflExtensionPage : ListPage, IDisposable
             Details = details,
         };
 
-        static async Task<Details> BuildDetails(Competition game)
+        static IDetails BuildDetails(Competition game)
         {
-            Details details = null;
+            IDetails details = null;
             if (game.Situation != null)
             {
-                var driveChartPath = await FetchImage(game);
+                // var driveChartPath = await FetchImage(game);
 
                 // var uri = new Uri(driveChartPath).AbsoluteUri;
                 var detailsBody = $"""
-![Drivechart]({driveChartPath})
-
 {game.Situation.DownDistanceText}
 
 {game.Situation.LastPlay.Text}
 """;
 
-                details = new Details()
+                details = new GameDetails(game)
                 {
                     Title = string.Join("-", game.Competitors.Select(c => $"{c.Team.Abbreviation} {c.Score}")),
                     Body = detailsBody,
-                    HeroImage = new(driveChartPath),
+
+                    // HeroImage = new(driveChartPath),
                 };
             }
 
@@ -186,7 +193,7 @@ internal sealed partial class NflExtensionPage : ListPage, IDisposable
         }
     }
 
-    private static async Task<string> FetchImage(Competition game)
+    public static async Task<string> FetchImage(Competition game)
     {
         var url = $"https://www.espn.com/nfl/game/_/gameId/{game.Id}";
         var rand = new Random().Next(int.MaxValue);
@@ -281,10 +288,13 @@ internal sealed partial class NflExtensionPage : ListPage, IDisposable
     private static async Task<string> FetchSvg(Competition game)
     {
         var url = $"https://www.espn.com/nfl/game/_/gameId/{game.Id}";
+        if (_browser == null)
+        {
+            return string.Empty;
+        }
 
         // Launch a headless browser
-        using var browser = await Puppeteer.LaunchAsync(new LaunchOptions { Headless = true });
-        using var page = await browser.NewPageAsync();
+        using var page = await _browser.NewPageAsync();
 
         // Navigate to the URL
         await page.GoToAsync(url, WaitUntilNavigation.Networkidle2);
@@ -324,9 +334,8 @@ internal sealed partial class NflExtensionPage : ListPage, IDisposable
         //    Console.WriteLine("The #drivechart element was not found or could not be extracted.");
         // }
 
-        // Close the browser
-        await browser.CloseAsync();
-
+        //// Close the browser
+        // await browser.CloseAsync();
         return svgContent;
     }
 
@@ -434,7 +443,7 @@ internal sealed partial class NflExtensionPage : ListPage, IDisposable
             var gameData = await FetchDataAsync(day);
             foreach (var ev in gameData.Events)
             {
-                var li = await EventNodeToItemAsync(ev);
+                var li = EventNodeToItem(ev);
                 games.Add(li);
             }
 
@@ -471,6 +480,92 @@ internal sealed partial class NflExtensionPage : ListPage, IDisposable
     }
 
     public void Dispose() => throw new NotImplementedException();
+}
+
+[System.Diagnostics.CodeAnalysis.SuppressMessage("StyleCop.CSharp.MaintainabilityRules", "SA1402:File may only contain a single type", Justification = "This is sample code")]
+public partial class MuhDetails : BaseObservable, IDetails
+{
+    private IconDataType _heroImage = new(string.Empty);
+    private string _title = string.Empty;
+    private string _body = string.Empty;
+    private IDetailsElement[] _metadata = [];
+
+    public virtual IconDataType HeroImage
+    {
+        get => _heroImage;
+        set
+        {
+            _heroImage = value;
+            OnPropertyChanged(nameof(HeroImage));
+        }
+    }
+
+    public string Title
+    {
+        get => _title;
+        set
+        {
+            _title = value;
+            OnPropertyChanged(nameof(Title));
+        }
+    }
+
+    public string Body
+    {
+        get => _body;
+        set
+        {
+            _body = value;
+            OnPropertyChanged(nameof(Body));
+        }
+    }
+
+    public IDetailsElement[] Metadata
+    {
+        get => _metadata;
+        set
+        {
+            _metadata = value;
+            OnPropertyChanged(nameof(Metadata));
+        }
+    }
+}
+
+[System.Diagnostics.CodeAnalysis.SuppressMessage("StyleCop.CSharp.MaintainabilityRules", "SA1402:File may only contain a single type", Justification = "This is sample code")]
+public partial class GameDetails : MuhDetails
+{
+    private readonly Competition _game;
+    private bool fetchedIcon;
+
+    public GameDetails(Competition game)
+    {
+        _game = game;
+    }
+
+    public override IconDataType HeroImage
+    {
+        get
+        {
+            if (fetchedIcon)
+            {
+                return base.HeroImage;
+            }
+            else
+            {
+                _ = Task.Run(() =>
+                {
+                    var t = NflExtensionPage.FetchImage(_game);
+                    t.ConfigureAwait(false);
+                    base.HeroImage = new(t.Result);
+                });
+                fetchedIcon = true;
+            }
+
+            return base.HeroImage;
+        }
+
+        set => base.HeroImage = value;
+    }
 }
 
 [System.Diagnostics.CodeAnalysis.SuppressMessage("StyleCop.CSharp.MaintainabilityRules", "SA1402:File may only contain a single type", Justification = "This is sample code")]
