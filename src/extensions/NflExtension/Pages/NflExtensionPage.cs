@@ -5,8 +5,8 @@
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
+using System.Drawing.Imaging;
 using System.Globalization;
-using System.IO;
 using System.Linq;
 using System.Net.Http;
 using System.Text.Json;
@@ -16,6 +16,7 @@ using System.Timers;
 using HtmlAgilityPack;
 using Microsoft.CmdPal.Extensions;
 using Microsoft.CmdPal.Extensions.Helpers;
+using Svg;
 
 namespace NflExtension;
 
@@ -161,7 +162,6 @@ internal sealed partial class NflExtensionPage : ListPage, IDisposable
                 // var uri = new Uri(driveChartPath).AbsoluteUri;
                 var detailsBody = $"""
 ![Drivechart]({driveChartPath})
-![asdf](https://upload.wikimedia.org/wikipedia/commons/1/10/2023_Obsidian_logo.svg)
 
 {game.Situation.DownDistanceText}
 
@@ -172,6 +172,7 @@ internal sealed partial class NflExtensionPage : ListPage, IDisposable
                 {
                     Title = string.Join("-", game.Competitors.Select(c => $"{c.Team.Abbreviation} {c.Score}")),
                     Body = detailsBody,
+                    HeroImage = new(driveChartPath),
                 };
             }
 
@@ -182,13 +183,22 @@ internal sealed partial class NflExtensionPage : ListPage, IDisposable
     private static async Task<string> FetchImage(Competition game)
     {
         var url = $"https://www.espn.com/nfl/game/_/gameId/{game.Id}";
-        var svgOutputPath = $"Assets/{game.Id}.svg";
-        svgOutputPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory.ToString(), svgOutputPath);
+        var rand = new Random().Next(int.MaxValue);
+        var svgOutputPath = $"Assets/games/{game.Id}_{rand}.svg";
+        var pngOutputPath = $"Assets/games/{game.Id}_{rand}.png";
+        var externalCssUrl = "https://cdn1.espn.net/fitt/5c11ba92527d-release-12-11-2024.2.0.1772/client/espnfitt/css/3246-55ffc5e5.css";
+
+        svgOutputPath = System.IO.Path.Combine(AppDomain.CurrentDomain.BaseDirectory.ToString(), svgOutputPath);
+        pngOutputPath = System.IO.Path.Combine(AppDomain.CurrentDomain.BaseDirectory.ToString(), pngOutputPath);
+        System.IO.Directory.CreateDirectory(System.IO.Path.Combine(AppDomain.CurrentDomain.BaseDirectory.ToString(), "Assets/games"));
         try
         {
             // Create an HttpClient to retrieve the webpage
             using var httpClient = new HttpClient();
             var response = await httpClient.GetStringAsync(url);
+
+            // Download the external CSS file
+            var cssResponse = await httpClient.GetStringAsync(externalCssUrl);
 
             // Load the response into an HtmlDocument
             var htmlDocument = new HtmlDocument();
@@ -200,14 +210,42 @@ internal sealed partial class NflExtensionPage : ListPage, IDisposable
             if (driveChartElement != null)
             {
                 // Extract the inner HTML content
-                var svgContent = driveChartElement.InnerHtml;
-                svgContent = $"<?xml version=\"1.0\" encoding=\"UTF-8\"?><svg xmlns=\"http://www.w3.org/2000/svg\" fill=\"none\" height=\"100%\" width=\"100%\" viewBox=\"0 0 512 512\">{svgContent}</svg>";
+                var inner = driveChartElement.InnerHtml;
 
-                // Save the content as an SVG file
-                File.WriteAllText(svgOutputPath, svgContent);
+                // svgContent = $"<?xml version=\"1.0\" encoding=\"UTF-8\"?><svg xmlns=\"http://www.w3.org/2000/svg\" fill=\"none\" height=\"100%\" width=\"100%\" viewBox=\"0 0 512 512\">{svgContent}</svg>";
 
-                Debug.WriteLine($"SVG saved successfully to {svgOutputPath}");
-                return Path.GetFullPath(svgOutputPath);
+                // Wrap the SVG content and include the downloaded CSS styles
+                inner = inner.Replace("xlink:href", "href");
+                var svgWithStyles = $@"
+<svg xmlns=""http://www.w3.org/2000/svg"" xmlns:xlink=""http://www.w3.org/1999/xlink"">
+    <style>
+        {cssResponse}
+    </style>
+    {inner}
+</svg>";
+
+                var outer = driveChartElement.OuterHtml;
+                var viewboxString = driveChartElement.Attributes["viewbox"].Value ?? "0 0 512 512";
+                var viewboxElements = viewboxString.Split(" ");
+
+                outer = outer.Replace("xlink:href", "href");
+                var svgDocument = SvgDocument.FromSvg<SvgDocument>(svgWithStyles);
+
+                svgDocument.ViewBox = new SvgViewBox(
+                     float.Parse(viewboxElements[0], NumberStyles.AllowLeadingSign, CultureInfo.InvariantCulture),
+                     float.Parse(viewboxElements[1], NumberStyles.AllowLeadingSign, CultureInfo.InvariantCulture),
+                     float.Parse(viewboxElements[2], NumberStyles.AllowLeadingSign, CultureInfo.InvariantCulture),
+                     float.Parse(viewboxElements[3], NumberStyles.AllowLeadingSign, CultureInfo.InvariantCulture));
+
+                var bitmap = svgDocument.Draw();
+                bitmap.Save(pngOutputPath, ImageFormat.Png);
+
+                //// Save the content as an SVG file
+                System.IO.File.WriteAllText(svgOutputPath, svgWithStyles);
+
+                // Debug.WriteLine($"SVG saved successfully to {svgOutputPath}");
+                // return Path.GetFullPath(svgOutputPath);
+                return System.IO.Path.GetFullPath(pngOutputPath);
             }
             else
             {

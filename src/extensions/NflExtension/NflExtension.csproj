@@ -35,6 +35,8 @@
     <PackageReference Include="Microsoft.CmdPal.Extensions.SDK" />
     <PackageReference Include="Microsoft.WindowsAppSDK" />
     <PackageReference Include="Microsoft.Web.WebView2" /> 
+    
+    <PackageReference Include="Svg" /> 
   </ItemGroup>
 
   <!--
