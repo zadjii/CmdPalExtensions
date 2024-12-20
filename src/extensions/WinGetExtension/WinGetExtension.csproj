@@ -6,6 +6,7 @@
     <ApplicationManifest>app.manifest</ApplicationManifest>
     <PublishProfile>win-$(Platform).pubxml</PublishProfile>
     <UseWinUI>false</UseWinUI>
+    <Nullable>enable</Nullable>
     <EnableMsixTooling>true</EnableMsixTooling>
     <OutputPath>$(SolutionDir)$(Platform)\$(Configuration)\WinUI3Apps\CmdPalExtensions\$(RootNamespace)</OutputPath>
     <AppendTargetFrameworkToOutputPath>false</AppendTargetFrameworkToOutputPath>

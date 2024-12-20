@@ -4,6 +4,7 @@
 
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
@@ -14,10 +15,16 @@ using WindowsPackageManager.Interop;
 
 namespace WinGetExtension;
 
-internal sealed partial class WinGetExtensionPage : DynamicListPage
+internal sealed partial class WinGetExtensionPage : DynamicListPage, IDisposable
 {
     private readonly WindowsPackageManagerStandardFactory _winGetFactory;
+    private readonly PackageManager _manager;
+    private readonly IReadOnlyList<PackageCatalogReference> _availableCatalogs;
+
     private readonly Lock _resultsLock = new();
+    private readonly Lock _searchLock = new();
+    private CancellationTokenSource? _cancellationTokenSource;
+
     private List<CatalogPackage> _results = [];
 
     public WinGetExtensionPage()
@@ -26,6 +33,10 @@ internal sealed partial class WinGetExtensionPage : DynamicListPage
         Name = "Search Winget";
 
         _winGetFactory = new WindowsPackageManagerStandardFactory();
+
+        // Create Package Manager and get available catalogs
+        _manager = _winGetFactory.CreatePackageManager();
+        _availableCatalogs = _manager.GetPackageCatalogs();
     }
 
     public override IListItem[] GetItems()
@@ -41,7 +52,7 @@ internal sealed partial class WinGetExtensionPage : DynamicListPage
                     }
                 ]
                 : _results.Select(p =>
-                new ListItem(new NoOpCommand())
+                new ListItem(new InstallPackageCommand(p))
                 {
                     Title = p.Name,
                     Subtitle = p.Id,
@@ -64,26 +75,66 @@ internal sealed partial class WinGetExtensionPage : DynamicListPage
             {
                 this._results.Clear();
             }
+
+            return;
         }
 
-        var packagesAsync = DoSearchAsync();
-        packagesAsync.ConfigureAwait(false);
-        lock (_resultsLock)
+        _ = Task.Run(async () =>
         {
-            this._results = packagesAsync.Result;
-        }
+            CancellationTokenSource? oldCts, currentCts;
+            lock (_searchLock)
+            {
+                oldCts = _cancellationTokenSource;
+                currentCts = _cancellationTokenSource = new CancellationTokenSource();
+            }
 
-        RaiseItemsChanged(this._results.Count);
+            oldCts?.Cancel();
+            var currentSearch = SearchText;
+            Debug.WriteLine($"Starting search for '{currentSearch}'");
+            var task = Task.Run(
+                () =>
+            {
+                // Were we already canceled?
+                currentCts.Token.ThrowIfCancellationRequested();
+                return DoSearchAsync(currentCts.Token);
+            },
+                currentCts.Token);
+            try
+            {
+                var results = await task;
+                Debug.WriteLine($"Completed search for '{currentSearch}'");
+                lock (_resultsLock)
+                {
+                    this._results = results;
+                }
+
+                RaiseItemsChanged(this._results.Count);
+            }
+            catch (OperationCanceledException)
+            {
+                // We were cancelled? oh no. Anyways.
+                Debug.WriteLine($"Cancelled search for {currentSearch}");
+            }
+            catch (Exception)
+            {
+                Debug.WriteLine($"Something else weird happened in {currentSearch}");
+            }
+            finally
+            {
+                lock (_searchLock)
+                {
+                    currentCts?.Dispose();
+                }
+
+                Debug.WriteLine($"Finally for '{currentSearch}'");
+            }
+        });
     }
 
-    private async Task<List<CatalogPackage>> DoSearchAsync()
+    private async Task<List<CatalogPackage>> DoSearchAsync(CancellationToken ct)
     {
         var query = SearchText;
         var results = new List<CatalogPackage>();
-
-        // Create Package Manager and get available catalogs
-        var manager = _winGetFactory.CreatePackageManager();
-        var availableCatalogs = manager.GetPackageCatalogs();
 
         var nameFilter = _winGetFactory.CreatePackageMatchFilter();
         nameFilter.Field = Microsoft.Management.Deployment.PackageMatchField.Name;
@@ -114,10 +165,21 @@ internal sealed partial class WinGetExtensionPage : DynamicListPage
             monikerFilter
           ];
 
-        foreach (var catalog in availableCatalogs.ToArray())
+        if (ct.IsCancellationRequested)
+        {
+            // Clean up here, then...
+            ct.ThrowIfCancellationRequested();
+        }
+
+        foreach (var catalog in _availableCatalogs.ToArray())
         {
             foreach (var filter in filters)
             {
+                if (ct.IsCancellationRequested)
+                {
+                    ct.ThrowIfCancellationRequested();
+                }
+
                 // Create a filter to search for packages
                 var filterList = _winGetFactory.CreateFindPackagesOptions();
 
@@ -128,6 +190,11 @@ internal sealed partial class WinGetExtensionPage : DynamicListPage
                 var searchResults = await catalog.Connect().PackageCatalog.FindPackagesAsync(filterList);
                 foreach (var match in searchResults.Matches.ToArray())
                 {
+                    if (ct.IsCancellationRequested)
+                    {
+                        ct.ThrowIfCancellationRequested();
+                    }
+
                     // Print the packages
                     var package = match.CatalogPackage;
 
@@ -138,5 +205,43 @@ internal sealed partial class WinGetExtensionPage : DynamicListPage
         }
 
         return results;
+    }
+
+    public void Dispose() => throw new NotImplementedException();
+}
+
+[System.Diagnostics.CodeAnalysis.SuppressMessage("StyleCop.CSharp.MaintainabilityRules", "SA1402:File may only contain a single type", Justification = "I just like it")]
+public partial class InstallPackageCommand : InvokableCommand
+{
+    private readonly CatalogPackage _package;
+
+    public InstallPackageCommand(CatalogPackage package)
+    {
+        _package = package;
+        Name = "Install";
+        _ = Task.Run(async () =>
+        {
+            var status = await _package.CheckInstalledStatusAsync();
+            var isInstalled = _package.InstalledVersion != null;
+            Icon = new(isInstalled ? "\uE930" : "\uE896"); // Completed : Download
+
+            if (status.Status == CheckInstalledStatusResultStatus.Ok)
+            {
+                var l = status.PackageInstalledStatus;
+                _ = l;
+            }
+        });
+    }
+
+    public override ICommandResult Invoke()
+    {
+        var result = _package.CheckInstalledStatus();
+        if (result.Status == CheckInstalledStatusResultStatus.Ok)
+        {
+            var l = result.PackageInstalledStatus;
+            _ = l;
+        }
+
+        return CommandResult.KeepOpen();
     }
 }

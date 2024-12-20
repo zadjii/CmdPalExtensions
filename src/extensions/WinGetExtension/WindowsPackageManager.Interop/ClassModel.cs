@@ -4,9 +4,11 @@
 
 using System;
 using System.Collections.Generic;
+using WindowsPackageManager.Interop;
 
-namespace WindowsPackageManager.Interop;
+namespace WinGetExtension.WindowsPackageManager.Interop;
 
+#nullable disable
 internal sealed class ClassModel
 {
     /// <summary>
@@ -41,8 +43,5 @@ internal sealed class ClassModel
     /// Get IID corresponding to the COM object
     /// </summary>
     /// <returns>IID.</returns>
-    public Guid GetIid()
-    {
-        return InterfaceType.GUID;
-    }
+    public Guid GetIid() => InterfaceType.GUID;
 }

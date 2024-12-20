@@ -5,6 +5,7 @@
 using System;
 using System.Collections.Generic;
 using Microsoft.Management.Deployment;
+using WinGetExtension.WindowsPackageManager.Interop;
 
 namespace WindowsPackageManager.Interop;
 
