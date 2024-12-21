@@ -53,11 +53,15 @@ internal sealed partial class WinGetExtensionPage : DynamicListPage, IDisposable
                     }
                 ]
                 : _results.Select(p =>
-                new ListItem(new InstallPackageCommand(p))
                 {
-                    Title = p.Name,
-                    Subtitle = p.Id,
-                    Tags = [new Tag() { Text = p.AvailableVersions[0].Version }],
+                    var versionText = p.AvailableVersions[0].Version;
+                    var versionTagText = versionText == "Unknown" && p.AvailableVersions[0].PackageCatalogId == "StoreEdgeFD" ? "msstore" : versionText;
+                    return new ListItem(new InstallPackageCommand(p))
+                    {
+                        Title = p.Name,
+                        Subtitle = p.Id,
+                        Tags = [new Tag() { Text = versionTagText }],
+                    };
                 }).ToArray();
         }
     }
@@ -141,6 +145,9 @@ internal sealed partial class WinGetExtensionPage : DynamicListPage, IDisposable
 
     private async Task<IEnumerable<CatalogPackage>> DoSearchAsync(CancellationToken ct)
     {
+        Stopwatch stopwatch = new();
+        stopwatch.Start();
+
         var query = SearchText;
         var results = new HashSet<CatalogPackage>(new PackageIdCompare());
 
@@ -186,6 +193,7 @@ internal sealed partial class WinGetExtensionPage : DynamicListPage, IDisposable
 
         var connections = _availableCatalogs.ToArray().Select(reference => reference.Connect().PackageCatalog);
 
+        // PackageCatalog[] connections = [await GetCompositeCatalog()];
         foreach (var catalog in connections)
         {
             Debug.WriteLine($"  Searching {catalog.Info.Name} ({query})");
@@ -223,7 +231,33 @@ internal sealed partial class WinGetExtensionPage : DynamicListPage, IDisposable
             }
         }
 
+        stopwatch.Stop();
+
+        Debug.WriteLine($"Search took${stopwatch.ElapsedMilliseconds}");
+
         return results;
+    }
+
+    internal async Task<PackageCatalog> GetCompositeCatalog()
+    {
+        // Get the remote catalog
+        // PackageCatalogReference selectedRemoteCatalogRef = _availableCatalogs[0]; // loop?
+        // Create the composite catalog
+        var createCompositePackageCatalogOptions = _winGetFactory.CreateCreateCompositePackageCatalogOptions();
+
+        // createCompositePackageCatalogOptions.Catalogs.Add(selectedRemoteCatalogRef);
+        foreach (var catalogReference in _availableCatalogs.ToArray())
+        {
+            createCompositePackageCatalogOptions.Catalogs.Add(catalogReference);
+        }
+
+        createCompositePackageCatalogOptions.CompositeSearchBehavior = CompositeSearchBehavior.RemotePackagesFromRemoteCatalogs;
+
+        // PackageManager packageManager = _manager;
+        var catalogRef = _manager.CreateCompositePackageCatalog(createCompositePackageCatalogOptions);
+        var connectResult = await catalogRef.ConnectAsync();
+        var compositeCatalog = connectResult.PackageCatalog;
+        return compositeCatalog;
     }
 
     public void Dispose() => throw new NotImplementedException();
