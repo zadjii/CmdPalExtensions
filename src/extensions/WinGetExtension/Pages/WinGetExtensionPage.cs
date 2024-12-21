@@ -5,6 +5,7 @@
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
+using System.Diagnostics.CodeAnalysis;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
@@ -25,7 +26,7 @@ internal sealed partial class WinGetExtensionPage : DynamicListPage, IDisposable
     private readonly Lock _searchLock = new();
     private CancellationTokenSource? _cancellationTokenSource;
 
-    private List<CatalogPackage> _results = [];
+    private IEnumerable<CatalogPackage> _results = [];
 
     public WinGetExtensionPage()
     {
@@ -44,7 +45,7 @@ internal sealed partial class WinGetExtensionPage : DynamicListPage, IDisposable
         IsLoading = false;
         lock (_resultsLock)
         {
-            return _results.Count == 0
+            return !_results.Any()
                 ? [
                     new ListItem(new NoOpCommand())
                     {
@@ -73,7 +74,7 @@ internal sealed partial class WinGetExtensionPage : DynamicListPage, IDisposable
         {
             lock (_resultsLock)
             {
-                this._results.Clear();
+                this._results = [];
             }
 
             return;
@@ -108,7 +109,7 @@ internal sealed partial class WinGetExtensionPage : DynamicListPage, IDisposable
                     this._results = results;
                 }
 
-                RaiseItemsChanged(this._results.Count);
+                RaiseItemsChanged(this._results.Count());
             }
             catch (OperationCanceledException)
             {
@@ -131,10 +132,17 @@ internal sealed partial class WinGetExtensionPage : DynamicListPage, IDisposable
         });
     }
 
-    private async Task<List<CatalogPackage>> DoSearchAsync(CancellationToken ct)
+    private sealed class PackageIdCompare : IEqualityComparer<CatalogPackage>
+    {
+        public bool Equals(CatalogPackage? x, CatalogPackage? y) => x?.Id == y?.Id;
+
+        public int GetHashCode([DisallowNull] CatalogPackage obj) => obj.Id.GetHashCode();
+    }
+
+    private async Task<IEnumerable<CatalogPackage>> DoSearchAsync(CancellationToken ct)
     {
         var query = SearchText;
-        var results = new List<CatalogPackage>();
+        var results = new HashSet<CatalogPackage>(new PackageIdCompare());
 
         var nameFilter = _winGetFactory.CreatePackageMatchFilter();
         nameFilter.Field = Microsoft.Management.Deployment.PackageMatchField.Name;
@@ -164,30 +172,39 @@ internal sealed partial class WinGetExtensionPage : DynamicListPage, IDisposable
             commandFilter,
             monikerFilter
           ];
-
+        var filterList = filters.Select(f =>
+        {
+            var opts = _winGetFactory.CreateFindPackagesOptions();
+            opts.Filters.Add(f);
+            return opts;
+        });
         if (ct.IsCancellationRequested)
         {
             // Clean up here, then...
             ct.ThrowIfCancellationRequested();
         }
 
-        foreach (var catalog in _availableCatalogs.ToArray())
+        var connections = _availableCatalogs.ToArray().Select(reference => reference.Connect().PackageCatalog);
+
+        foreach (var catalog in connections)
         {
-            foreach (var filter in filters)
+            Debug.WriteLine($"  Searching {catalog.Info.Name} ({query})");
+
+            foreach (var opts in filterList)
             {
                 if (ct.IsCancellationRequested)
                 {
                     ct.ThrowIfCancellationRequested();
                 }
 
-                // Create a filter to search for packages
-                var filterList = _winGetFactory.CreateFindPackagesOptions();
+                //// Create a filter to search for packages
+                // var filterList = _winGetFactory.CreateFindPackagesOptions();
 
-                // Add the query to the filter
-                filterList.Filters.Add(filter);
+                //// Add the query to the filter
+                // filterList.Filters.Add(filter);
 
                 // Find the packages with the filters
-                var searchResults = await catalog.Connect().PackageCatalog.FindPackagesAsync(filterList);
+                var searchResults = await catalog/*.Connect().PackageCatalog*/.FindPackagesAsync(opts);
                 foreach (var match in searchResults.Matches.ToArray())
                 {
                     if (ct.IsCancellationRequested)
@@ -201,6 +218,8 @@ internal sealed partial class WinGetExtensionPage : DynamicListPage, IDisposable
                     // Console.WriteLine(Package.Name);
                     results.Add(package);
                 }
+
+                Debug.WriteLine($"    [{catalog.Info.Name}] ({query}): count: {results.Count}");
             }
         }
 
