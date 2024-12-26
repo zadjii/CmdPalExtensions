@@ -4,6 +4,7 @@
 
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Text.Json;
@@ -262,6 +263,44 @@ public partial class AppendToNoteForm : Form
 }
 
 [System.Diagnostics.CodeAnalysis.SuppressMessage("StyleCop.CSharp.MaintainabilityRules", "SA1402:File may only contain a single type", Justification = "Sample code")]
+internal sealed partial class NewNoteCommand : InvokableCommand
+{
+    public NewNoteCommand()
+    {
+        Icon = new(Path.Combine(AppDomain.CurrentDomain.BaseDirectory.ToString(), "Assets\\obsidian-logo.png"));
+        Name = "New note";
+    }
+
+    public override ICommandResult Invoke()
+    {
+        var vaultPath = @"C:\Users\zadji\Obsidian\Notes";
+        var vaultName = Path.GetFileName(vaultPath);
+        var uri = $"obsidian://new?vault={Uri.EscapeDataString(vaultName)}";
+        Process.Start(new ProcessStartInfo(uri) { UseShellExecute = true });
+        return CommandResult.Dismiss();
+    }
+}
+
+[System.Diagnostics.CodeAnalysis.SuppressMessage("StyleCop.CSharp.MaintainabilityRules", "SA1402:File may only contain a single type", Justification = "Sample code")]
+internal sealed partial class OpenDailyNoteCommand : InvokableCommand
+{
+    public OpenDailyNoteCommand()
+    {
+        Icon = new(Path.Combine(AppDomain.CurrentDomain.BaseDirectory.ToString(), "Assets\\obsidian-logo.png"));
+        Name = "Open";
+    }
+
+    public override ICommandResult Invoke()
+    {
+        var vaultPath = @"C:\Users\zadji\Obsidian\Notes";
+        var vaultName = Path.GetFileName(vaultPath);
+        var uri = $"obsidian://daily ?vault={Uri.EscapeDataString(vaultName)}";
+        Process.Start(new ProcessStartInfo(uri) { UseShellExecute = true });
+        return CommandResult.Dismiss();
+    }
+}
+
+[System.Diagnostics.CodeAnalysis.SuppressMessage("StyleCop.CSharp.MaintainabilityRules", "SA1402:File may only contain a single type", Justification = "Sample code")]
 public sealed class Note
 {
     public string VaultPath { get; set; } = string.Empty;
@@ -276,7 +315,7 @@ public sealed class Note
 
     public string RelativePath => Path.GetRelativePath(VaultPath, AbsolutePath);
 
-    public string ObsidianProtocolUri => $"obsidian://open?vault={VaultName}&file={Uri.EscapeDataString(RelativePath)}";
+    public string ObsidianProtocolUri => $"obsidian://open?vault={Uri.EscapeDataString(VaultName)}&file={Uri.EscapeDataString(RelativePath)}";
 
     public string NoteContent()
     {

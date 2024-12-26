@@ -146,6 +146,13 @@ internal sealed partial class NflExtensionPage : ListPage, IDisposable
             Icon = icon,
             Tags = tags,
             Details = details,
+            MoreCommands = [
+                new CommandContextItem(new OpenUrlCommand("https://reddit1.nflbite.com/"))
+                {
+                    Title = "Go to NFLbite",
+                    Icon = new("https://reddit1.nflbite.com/icon.png"),
+                }
+            ],
         };
 
         static IDetails BuildDetails(Competition game)
@@ -276,6 +283,7 @@ public sealed partial class NflGameCommand : InvokableCommand
     {
         _command = new OpenUrlCommand($"https://www.espn.com/nfl/game/_/gameId/{game.Id}") { Name = "View on ESPN" };
         Game = game;
+        Name = "View on ESPN";
     }
 
     public override ICommandResult Invoke() => _command.Invoke();
