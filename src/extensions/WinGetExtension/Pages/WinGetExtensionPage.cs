@@ -12,16 +12,12 @@ using System.Threading.Tasks;
 using Microsoft.CmdPal.Extensions;
 using Microsoft.CmdPal.Extensions.Helpers;
 using Microsoft.Management.Deployment;
-using WindowsPackageManager.Interop;
+using WinGetExtension.Pages;
 
 namespace WinGetExtension;
 
 internal sealed partial class WinGetExtensionPage : DynamicListPage, IDisposable
 {
-    private readonly WindowsPackageManagerStandardFactory _winGetFactory;
-    private readonly PackageManager _manager;
-    private readonly IReadOnlyList<PackageCatalogReference> _availableCatalogs;
-
     private readonly Lock _resultsLock = new();
     private readonly Lock _searchLock = new();
     private CancellationTokenSource? _cancellationTokenSource;
@@ -32,12 +28,6 @@ internal sealed partial class WinGetExtensionPage : DynamicListPage, IDisposable
     {
         Icon = new("\uE74C");
         Name = "Search Winget";
-
-        _winGetFactory = new WindowsPackageManagerStandardFactory();
-
-        // Create Package Manager and get available catalogs
-        _manager = _winGetFactory.CreatePackageManager();
-        _availableCatalogs = _manager.GetPackageCatalogs();
     }
 
     public override IListItem[] GetItems()
@@ -136,13 +126,6 @@ internal sealed partial class WinGetExtensionPage : DynamicListPage, IDisposable
         });
     }
 
-    private sealed class PackageIdCompare : IEqualityComparer<CatalogPackage>
-    {
-        public bool Equals(CatalogPackage? x, CatalogPackage? y) => x?.Id == y?.Id;
-
-        public int GetHashCode([DisallowNull] CatalogPackage obj) => obj.Id.GetHashCode();
-    }
-
     private async Task<IEnumerable<CatalogPackage>> DoSearchAsync(CancellationToken ct)
     {
         Stopwatch stopwatch = new();
@@ -151,23 +134,23 @@ internal sealed partial class WinGetExtensionPage : DynamicListPage, IDisposable
         var query = SearchText;
         var results = new HashSet<CatalogPackage>(new PackageIdCompare());
 
-        var nameFilter = _winGetFactory.CreatePackageMatchFilter();
+        var nameFilter = WinGetStatics.WinGetFactory.CreatePackageMatchFilter();
         nameFilter.Field = Microsoft.Management.Deployment.PackageMatchField.Name;
         nameFilter.Value = query;
 
         // filterList.Filters.Add(nameFilter);
-        var idFilter = _winGetFactory.CreatePackageMatchFilter();
+        var idFilter = WinGetStatics.WinGetFactory.CreatePackageMatchFilter();
         idFilter.Field = Microsoft.Management.Deployment.PackageMatchField.Id;
         idFilter.Value = query;
         idFilter.Option = PackageFieldMatchOption.ContainsCaseInsensitive;
 
         // filterList.Filters.Add(idFilter);
-        var monikerFilter = _winGetFactory.CreatePackageMatchFilter();
+        var monikerFilter = WinGetStatics.WinGetFactory.CreatePackageMatchFilter();
         monikerFilter.Field = Microsoft.Management.Deployment.PackageMatchField.Moniker;
         monikerFilter.Value = query;
         monikerFilter.Option = PackageFieldMatchOption.ContainsCaseInsensitive;
 
-        var commandFilter = _winGetFactory.CreatePackageMatchFilter();
+        var commandFilter = WinGetStatics.WinGetFactory.CreatePackageMatchFilter();
         commandFilter.Field = Microsoft.Management.Deployment.PackageMatchField.Command;
         commandFilter.Value = query;
         commandFilter.Option = PackageFieldMatchOption.ContainsCaseInsensitive;
@@ -181,7 +164,7 @@ internal sealed partial class WinGetExtensionPage : DynamicListPage, IDisposable
           ];
         var filterList = filters.Select(f =>
         {
-            var opts = _winGetFactory.CreateFindPackagesOptions();
+            var opts = WinGetStatics.WinGetFactory.CreateFindPackagesOptions();
             opts.Filters.Add(f);
             return opts;
         });
@@ -191,9 +174,8 @@ internal sealed partial class WinGetExtensionPage : DynamicListPage, IDisposable
             ct.ThrowIfCancellationRequested();
         }
 
-        var connections = _availableCatalogs.ToArray().Select(reference => reference.Connect().PackageCatalog);
+        var connections = WinGetStatics.AvailableCatalogs.ToArray().Select(reference => reference.Connect().PackageCatalog);
 
-        // PackageCatalog[] connections = [await GetCompositeCatalog()];
         foreach (var catalog in connections)
         {
             Debug.WriteLine($"  Searching {catalog.Info.Name} ({query})");
@@ -205,14 +187,8 @@ internal sealed partial class WinGetExtensionPage : DynamicListPage, IDisposable
                     ct.ThrowIfCancellationRequested();
                 }
 
-                //// Create a filter to search for packages
-                // var filterList = _winGetFactory.CreateFindPackagesOptions();
-
-                //// Add the query to the filter
-                // filterList.Filters.Add(filter);
-
                 // Find the packages with the filters
-                var searchResults = await catalog/*.Connect().PackageCatalog*/.FindPackagesAsync(opts);
+                var searchResults = await catalog.FindPackagesAsync(opts);
                 foreach (var match in searchResults.Matches.ToArray())
                 {
                     if (ct.IsCancellationRequested)
@@ -233,7 +209,7 @@ internal sealed partial class WinGetExtensionPage : DynamicListPage, IDisposable
 
         stopwatch.Stop();
 
-        Debug.WriteLine($"Search took${stopwatch.ElapsedMilliseconds}");
+        Debug.WriteLine($"Search took {stopwatch.ElapsedMilliseconds}");
 
         return results;
     }
@@ -243,24 +219,31 @@ internal sealed partial class WinGetExtensionPage : DynamicListPage, IDisposable
         // Get the remote catalog
         // PackageCatalogReference selectedRemoteCatalogRef = _availableCatalogs[0]; // loop?
         // Create the composite catalog
-        var createCompositePackageCatalogOptions = _winGetFactory.CreateCreateCompositePackageCatalogOptions();
+        var createCompositePackageCatalogOptions = WinGetStatics.WinGetFactory.CreateCreateCompositePackageCatalogOptions();
 
         // createCompositePackageCatalogOptions.Catalogs.Add(selectedRemoteCatalogRef);
-        foreach (var catalogReference in _availableCatalogs.ToArray())
+        foreach (var catalogReference in WinGetStatics.AvailableCatalogs.ToArray())
         {
             createCompositePackageCatalogOptions.Catalogs.Add(catalogReference);
         }
 
         createCompositePackageCatalogOptions.CompositeSearchBehavior = CompositeSearchBehavior.RemotePackagesFromRemoteCatalogs;
 
-        // PackageManager packageManager = _manager;
-        var catalogRef = _manager.CreateCompositePackageCatalog(createCompositePackageCatalogOptions);
+        var catalogRef = WinGetStatics.Manager.CreateCompositePackageCatalog(createCompositePackageCatalogOptions);
         var connectResult = await catalogRef.ConnectAsync();
         var compositeCatalog = connectResult.PackageCatalog;
         return compositeCatalog;
     }
 
     public void Dispose() => throw new NotImplementedException();
+}
+
+[System.Diagnostics.CodeAnalysis.SuppressMessage("StyleCop.CSharp.MaintainabilityRules", "SA1402:File may only contain a single type", Justification = "I just like it")]
+public sealed class PackageIdCompare : IEqualityComparer<CatalogPackage>
+{
+    public bool Equals(CatalogPackage? x, CatalogPackage? y) => x?.Id == y?.Id;
+
+    public int GetHashCode([DisallowNull] CatalogPackage obj) => obj.Id.GetHashCode();
 }
 
 [System.Diagnostics.CodeAnalysis.SuppressMessage("StyleCop.CSharp.MaintainabilityRules", "SA1402:File may only contain a single type", Justification = "I just like it")]
@@ -296,5 +279,77 @@ public partial class InstallPackageCommand : InvokableCommand
         }
 
         return CommandResult.KeepOpen();
+    }
+}
+
+[System.Diagnostics.CodeAnalysis.SuppressMessage("StyleCop.CSharp.MaintainabilityRules", "SA1402:File may only contain a single type", Justification = "I just like it")]
+public partial class InstalledPackagesPage : ListPage
+{
+    public InstalledPackagesPage()
+    {
+        Icon = new("\uE74C");
+        Name = "Installed Packages";
+        IsLoading = true;
+    }
+
+    internal async Task<PackageCatalog> GetLocalCatalog()
+    {
+        var catalogRef = WinGetStatics.Manager.GetLocalPackageCatalog(LocalPackageCatalog.InstalledPackages);
+        var connectResult = await catalogRef.ConnectAsync();
+        var compositeCatalog = connectResult.PackageCatalog;
+        return compositeCatalog;
+    }
+
+    public override IListItem[] GetItems()
+    {
+        var fetchAsync = FetchLocalPackagesAsync();
+        fetchAsync.ConfigureAwait(false);
+        var results = fetchAsync.Result;
+        IListItem[] listItems = !results.Any()
+            ? [
+                new ListItem(new NoOpCommand())
+                    {
+                        Title = "No packages found",
+                    }
+            ]
+            : results.Select(p =>
+            {
+                var versionText = p.InstalledVersion?.Version ?? string.Empty;
+
+                // var versionTagText = versionText == "Unknown" && p.AvailableVersions[0].PackageCatalogId == "StoreEdgeFD" ? "msstore" : versionText;
+                Tag[] tags = string.IsNullOrEmpty(versionText) ? [] : [new Tag() { Text = versionText }];
+                return new ListItem(new InstallPackageCommand(p))
+                {
+                    Title = p.Name,
+                    Subtitle = p.Id,
+                    Tags = tags,
+                };
+            }).ToArray();
+        IsLoading = false;
+        return listItems;
+    }
+
+    private async Task<IEnumerable<CatalogPackage>> FetchLocalPackagesAsync()
+    {
+        Stopwatch stopwatch = new();
+        stopwatch.Start();
+
+        var results = new HashSet<CatalogPackage>(new PackageIdCompare());
+
+        var catalog = await GetLocalCatalog();
+        var opts = WinGetStatics.WinGetFactory.CreateFindPackagesOptions();
+        var searchResults = await catalog.FindPackagesAsync(opts);
+        foreach (var match in searchResults.Matches.ToArray())
+        {
+            // Print the packages
+            var package = match.CatalogPackage;
+            results.Add(package);
+        }
+
+        stopwatch.Stop();
+
+        Debug.WriteLine($"Search took {stopwatch.ElapsedMilliseconds}");
+
+        return results;
     }
 }

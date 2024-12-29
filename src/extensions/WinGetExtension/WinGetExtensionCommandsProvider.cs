@@ -2,11 +2,6 @@
 // The Microsoft Corporation licenses this file to you under the MIT license.
 // See the LICENSE file in the project root for more information.
 
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 using Microsoft.CmdPal.Extensions;
 using Microsoft.CmdPal.Extensions.Helpers;
 
@@ -16,15 +11,13 @@ public partial class WinGetExtensionActionsProvider : CommandProvider
 {
     public WinGetExtensionActionsProvider()
     {
-        DisplayName = "WinGet for the Command Palette Commands";
+        DisplayName = "WinGet for the Command Palette";
     }
 
     private readonly IListItem[] _commands = [
         new ListItem(new WinGetExtensionPage()),
+        new ListItem(new InstalledPackagesPage())
     ];
 
-    public override IListItem[] TopLevelCommands()
-    {
-        return _commands;
-    }
+    public override IListItem[] TopLevelCommands() => _commands;
 }
