@@ -64,7 +64,7 @@ internal sealed partial class ObsidianExtensionPage : ListPage
         return listItems.ToArray();
     }
 
-    private List<Note> GetNotes(string vaultPath)
+    private IEnumerable<Note> GetNotes(string vaultPath)
     {
         var notes = new List<Note>();
 
@@ -76,15 +76,14 @@ internal sealed partial class ObsidianExtensionPage : ListPage
             foreach (var noteFile in noteFiles)
             {
                 // Display the note name without the full path or file extension
-                notes.Add(new Note()
+                notes.Add(new Note(Path.GetFullPath(noteFile))
                 {
                     VaultPath = vaultPath,
-                    AbsolutePath = Path.GetFullPath(noteFile),
                 });
             }
         }
 
-        return notes;
+        return notes.OrderByDescending(n => n.LastModified);
     }
 }
 
@@ -301,13 +300,15 @@ internal sealed partial class OpenDailyNoteCommand : InvokableCommand
 }
 
 [System.Diagnostics.CodeAnalysis.SuppressMessage("StyleCop.CSharp.MaintainabilityRules", "SA1402:File may only contain a single type", Justification = "Sample code")]
-public sealed class Note
+public sealed class Note(string absolutePath)
 {
     public string VaultPath { get; set; } = string.Empty;
 
     public string VaultName => Path.GetFileName(VaultPath);
 
-    public string AbsolutePath { get; set; } = string.Empty;
+    public string AbsolutePath { get; set; } = absolutePath;
+
+    public DateTime LastModified { get; } = File.GetLastWriteTimeUtc(absolutePath);
 
     public string Name => Path.GetFileNameWithoutExtension(AbsolutePath);
 
