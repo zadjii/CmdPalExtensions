@@ -10,7 +10,7 @@
 
   <Identity
     Name="ObsidianExtension"
-    Publisher="CN=zadjii"
+    Publisher="CN=Michael Griese, O=Michael Griese, L=Verona, S=Wisconsin, C=US"
     Version="0.0.1.0" />
 
   <Properties>

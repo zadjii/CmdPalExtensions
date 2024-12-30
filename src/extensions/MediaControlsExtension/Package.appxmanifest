@@ -10,7 +10,7 @@
 
   <Identity
     Name="MediaControlsExtension"
-    Publisher="CN=zadjii"
+    Publisher="CN=Michael Griese, O=Michael Griese, L=Verona, S=Wisconsin, C=US"
     Version="1.0.0.0" />
 
   <Properties>
