@@ -23,7 +23,7 @@ public sealed partial class SampleExtension : IExtension, IDisposable
         this._extensionDisposedEvent = extensionDisposedEvent;
     }
 
-    public object GetProvider(ProviderType providerType)
+    public object? GetProvider(ProviderType providerType)
     {
         switch (providerType)
         {
@@ -34,8 +34,5 @@ public sealed partial class SampleExtension : IExtension, IDisposable
         }
     }
 
-    public void Dispose()
-    {
-        this._extensionDisposedEvent.Set();
-    }
+    public void Dispose() => this._extensionDisposedEvent.Set();
 }

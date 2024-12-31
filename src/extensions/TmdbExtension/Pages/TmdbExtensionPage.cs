@@ -4,9 +4,11 @@
 
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Text.Json;
+using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.CmdPal.Extensions;
 using Microsoft.CmdPal.Extensions.Helpers;
@@ -14,8 +16,12 @@ using RestSharp;
 
 namespace TmdbExtension;
 
-internal sealed partial class TmdbExtensionPage : DynamicListPage
+internal sealed partial class TmdbExtensionPage : DynamicListPage, IDisposable
 {
+    private readonly Lock _resultsLock = new();
+    private readonly Lock _searchLock = new();
+    private CancellationTokenSource? _cancellationTokenSource;
+
     private IListItem[] _results = [];
 
     public TmdbExtensionPage()
@@ -27,37 +33,122 @@ internal sealed partial class TmdbExtensionPage : DynamicListPage
 
     public override IListItem[] GetItems()
     {
-        return _results.Length > 0 ? _results : [
-            new ListItem(new NoOpCommand()) { Title = "No results found" }
-        ];
+        lock (_resultsLock)
+        {
+            return _results.Length > 0 ? _results : [
+                new ListItem(new NoOpCommand()) { Title = "No results found" }
+            ];
+        }
     }
 
-    public override void UpdateSearchText(string oldSearch, string newSearch) => _ = Task.Run(async () => await DoSearchAsync(newSearch));
-
-    private async Task DoSearchAsync(string query)
+    public override void UpdateSearchText(string oldSearch, string newSearch)
     {
-        if (string.IsNullOrEmpty(query))
+        if (newSearch == oldSearch)
         {
-            _results = [];
+            return;
+        }
+
+        if (string.IsNullOrEmpty(newSearch))
+        {
+            lock (_resultsLock)
+            {
+                this._results = [];
+            }
+
             RaiseItemsChanged(_results.Length);
             return;
         }
 
-        IsLoading = true;
+        // _ = Task.Run(async () => await DoSearchAsync(newSearch));
+        _ = Task.Run(async () =>
+        {
+            CancellationTokenSource? oldCts, currentCts;
+            lock (_searchLock)
+            {
+                oldCts = _cancellationTokenSource;
+                currentCts = _cancellationTokenSource = new CancellationTokenSource();
+            }
+
+            IsLoading = true;
+            oldCts?.Cancel();
+            var currentSearch = SearchText;
+            Debug.WriteLine($"Starting search for '{currentSearch}'");
+            var task = Task.Run(
+                () =>
+                {
+                    // Were we already canceled?
+                    currentCts.Token.ThrowIfCancellationRequested();
+                    return DoSearchAsync(newSearch, currentCts.Token);
+                },
+                currentCts.Token);
+
+            try
+            {
+                var results = await task;
+                Debug.WriteLine($"Completed search for '{currentSearch}'");
+                lock (_resultsLock)
+                {
+                    this._results = results;
+                }
+
+                IsLoading = false;
+
+                RaiseItemsChanged(this._results.Length);
+            }
+            catch (OperationCanceledException)
+            {
+                // We were cancelled? oh no. Anyways.
+                Debug.WriteLine($"Cancelled search for {currentSearch}");
+            }
+            catch (Exception)
+            {
+                Debug.WriteLine($"Something else weird happened in {currentSearch}");
+                IsLoading = false;
+            }
+            finally
+            {
+                lock (_searchLock)
+                {
+                    currentCts?.Dispose();
+                }
+
+                Debug.WriteLine($"Finally for '{currentSearch}'");
+            }
+        });
+    }
+
+    private async Task<IListItem[]> DoSearchAsync(string query, CancellationToken ct)
+    {
+        // IsLoading = true;
         var options = new RestClientOptions($"https://api.themoviedb.org/3/search/movie?query={Uri.EscapeDataString(query)}");
         var client = new RestClient(options);
         var request = new RestRequest(string.Empty);
         request.AddHeader("accept", "application/json");
         request.AddHeader("Authorization", $"Bearer {TmdbExtensionActionsProvider.BearerToken}");
-        var response = await client.GetAsync(request);
+
+        ct.ThrowIfCancellationRequested();
+
+        var response = await client.GetAsync(request, cancellationToken: ct);
         var content = response.Content;
 
-        _ = content;
+        if (string.IsNullOrEmpty(content))
+        {
+            // IsLoading = false;
+            return [];
+        }
+
         var json = JsonSerializer.Deserialize<MovieSearchResponse>(content);
+        if (json == null)
+        {
+            // IsLoading = false;
+            throw new InvalidDataException("Somehow got null data from the movie search");
+        }
 
         var movies = json.Results;
-        _results = movies.Select(m =>
+        var r = movies.Select(m =>
         {
+            ct.ThrowIfCancellationRequested();
+
             var moviePage = new TmdbMoviePage(m);
             return new ListItem(moviePage)
             {
@@ -66,12 +157,14 @@ internal sealed partial class TmdbExtensionPage : DynamicListPage
                 Details = moviePage.Details,
             };
         }).ToArray();
-        IsLoading = false;
-        RaiseItemsChanged(_results.Length);
 
-        // Once we get the ID
-        // https://api.themoviedb.org/3/movie/{movie_id}?append_to_response=watch%2Fproviders
-        // var options = new RestClientOptions("https://api.themoviedb.org/3/movie/13669/watch/providers");
+        return r;
+    }
+
+    public void Dispose()
+    {
+        _cancellationTokenSource?.Cancel();
+        _cancellationTokenSource?.Dispose();
     }
 }
 
@@ -94,6 +187,7 @@ internal sealed partial class TmdbMoviePage : ListPage
 
         Details = new Details()
         {
+            Title = _movie.Title,
             Body = _movie.Overview ?? string.Empty,
             HeroImage = new($"https://image.tmdb.org/t/p/w92/{_movie.Poster_path}"),
         };
@@ -121,10 +215,23 @@ internal sealed partial class TmdbMoviePage : ListPage
         var response = await client.GetAsync(request);
         var content = response.Content;
 
+        if (string.IsNullOrEmpty(content))
+        {
+            IsLoading = false;
+            return;
+        }
+
         var movieDetails = JsonSerializer.Deserialize<MovieDetailsResponse>(content);
+
+        if (movieDetails == null)
+        {
+            IsLoading = false;
+            throw new InvalidDataException("Somehow got null data from the movie details");
+        }
 
         Details = new Details()
         {
+            Title = _movie.Title,
             Body = _movie.Overview ?? string.Empty,
             HeroImage = new($"https://image.tmdb.org/t/p/w92/{_movie.Poster_path}"),
             Metadata = [new DetailsElement() { Key = "Genre", Data = new DetailsTags() { Tags = movieDetails.Genres.Select(g => new Tag() { Text = g.Name }).ToArray() } }],
@@ -142,7 +249,8 @@ internal sealed partial class TmdbMoviePage : ListPage
         };
         items.Add(openOnTmdb);
 
-        if (movieDetails.Providers.Countries.TryGetValue("US", out var us))
+        if (movieDetails.Providers != null
+            && movieDetails.Providers.Countries.TryGetValue("US", out var us))
         {
             var link = us.Link;
             var viewStreams = new ListItem(new OpenUrlCommand(link)

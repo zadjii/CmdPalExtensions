@@ -15,7 +15,7 @@ public sealed class MovieSearchResponse
     public int Page { get; set; }
 
     [JsonPropertyName("results")]
-    public MovieSearchResult[] Results { get; set; }
+    public MovieSearchResult[] Results { get; set; } = [];
 }
 
 [System.Diagnostics.CodeAnalysis.SuppressMessage("StyleCop.CSharp.MaintainabilityRules", "SA1402:File may only contain a single type", Justification = "This is sample code")]
@@ -25,37 +25,37 @@ public sealed class MovieSearchResult
     public bool Adult { get; set; }
 
     [JsonPropertyName("backdrop_path")]
-    public string Backdrop_path { get; set; }
+    public string Backdrop_path { get; set; } = string.Empty;
 
     [JsonPropertyName("genre_ids")]
-    public int[] Genre_ids { get; set; }
+    public int[] Genre_ids { get; set; } = [];
 
     [JsonPropertyName("id")]
     public int Id { get; set; }
 
     [JsonPropertyName("original_language")]
-    public string Original_language { get; set; }
+    public string Original_language { get; set; } = string.Empty;
 
     [JsonPropertyName("original_title")]
-    public string Original_title { get; set; }
+    public string Original_title { get; set; } = string.Empty;
 
     [JsonPropertyName("overview")]
-    public string Overview { get; set; }
+    public string Overview { get; set; } = string.Empty;
 
     [JsonPropertyName("popularity")]
     public double Popularity { get; set; }
 
     [JsonPropertyName("poster_path")]
-    public string Poster_path { get; set; }
+    public string Poster_path { get; set; } = string.Empty;
 
     [JsonPropertyName("release_date")]
-    public string Release_date { get; set; }
+    public string Release_date { get; set; } = string.Empty;
 
     [JsonIgnore]
     public string ReleaseYear => Release_date.Split('-')[0];
 
     [JsonPropertyName("title")]
-    public string Title { get; set; }
+    public string Title { get; set; } = string.Empty;
 
     [JsonPropertyName("video")]
     public bool Video { get; set; }
@@ -80,58 +80,58 @@ public sealed class MovieDetailsResponse
     public bool Adult { get; set; }
 
     [JsonPropertyName("backdrop_path")]
-    public string Backdrop_path { get; set; }
+    public string Backdrop_path { get; set; } = string.Empty;
 
     [JsonPropertyName("homepage")]
-    public string Homepage { get; set; }
+    public string Homepage { get; set; } = string.Empty;
 
     [JsonPropertyName("poster_path")]
-    public string Poster_path { get; set; }
+    public string Poster_path { get; set; } = string.Empty;
 
     [JsonPropertyName("runtime")]
     public int Runtime { get; set; }
 
     [JsonPropertyName("genres")]
-    public Genre[] Genres { get; set; }
+    public Genre[] Genres { get; set; } = [];
 
     [JsonPropertyName("watch/providers")]
-    public AllCountryProviders Providers { get; set; }
+    public AllCountryProviders? Providers { get; set; }
 }
 
 [System.Diagnostics.CodeAnalysis.SuppressMessage("StyleCop.CSharp.MaintainabilityRules", "SA1402:File may only contain a single type", Justification = "This is sample code")]
 public sealed class AllCountryProviders
 {
     [JsonPropertyName("results")]
-    public Dictionary<string, StreamingProviders> Countries { get; set; }
+    public Dictionary<string, StreamingProviders> Countries { get; set; } = [];
 }
 
 [System.Diagnostics.CodeAnalysis.SuppressMessage("StyleCop.CSharp.MaintainabilityRules", "SA1402:File may only contain a single type", Justification = "This is sample code")]
 public sealed class StreamingProviders
 {
     [JsonPropertyName("link")]
-    public string Link { get; set; }
+    public string Link { get; set; } = string.Empty;
 
     [JsonPropertyName("flatrate")]
-    public StreamingProvider[] Flatrate { get; set; }
+    public StreamingProvider[] Flatrate { get; set; } = [];
 
     [JsonPropertyName("rent")]
-    public StreamingProvider[] Rent { get; set; }
+    public StreamingProvider[] Rent { get; set; } = [];
 
     [JsonPropertyName("buy")]
-    public StreamingProvider[] Buy { get; set; }
+    public StreamingProvider[] Buy { get; set; } = [];
 }
 
 [System.Diagnostics.CodeAnalysis.SuppressMessage("StyleCop.CSharp.MaintainabilityRules", "SA1402:File may only contain a single type", Justification = "This is sample code")]
 public sealed class StreamingProvider
 {
     [JsonPropertyName("logo_path")]
-    public string Logo_path { get; set; }
+    public string Logo_path { get; set; } = string.Empty;
 
     [JsonPropertyName("provider_id")]
     public int Provider_id { get; set; }
 
     [JsonPropertyName("provider_name")]
-    public string Provider_name { get; set; }
+    public string Provider_name { get; set; } = string.Empty;
 
     [JsonPropertyName("display_priority")]
     public int Display_priority { get; set; }
@@ -141,7 +141,7 @@ public sealed class StreamingProvider
 public sealed class Genre
 {
     [JsonPropertyName("name")]
-    public string Name { get; set; }
+    public string Name { get; set; } = string.Empty;
 
     [JsonPropertyName("id")]
     public int Id { get; set; }

@@ -49,6 +49,11 @@ public partial class TmdbExtensionActionsProvider : CommandProvider
         secretProvider.TryGet("keys:bearerToken", out var token);
 
         // Todo! probably throw if we fail here
+        if (token == null)
+        {
+            throw new InvalidDataException("Somehow, I failed to package the token into the app");
+        }
+
         BearerToken = token;
     }
 }
