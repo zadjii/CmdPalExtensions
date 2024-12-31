@@ -91,6 +91,9 @@ public sealed class MovieDetailsResponse
     [JsonPropertyName("runtime")]
     public int Runtime { get; set; }
 
+    [JsonPropertyName("genres")]
+    public Genre[] Genres { get; set; }
+
     [JsonPropertyName("watch/providers")]
     public AllCountryProviders Providers { get; set; }
 }
@@ -132,4 +135,14 @@ public sealed class StreamingProvider
 
     [JsonPropertyName("display_priority")]
     public int Display_priority { get; set; }
+}
+
+[System.Diagnostics.CodeAnalysis.SuppressMessage("StyleCop.CSharp.MaintainabilityRules", "SA1402:File may only contain a single type", Justification = "This is sample code")]
+public sealed class Genre
+{
+    [JsonPropertyName("name")]
+    public string Name { get; set; }
+
+    [JsonPropertyName("id")]
+    public int Id { get; set; }
 }

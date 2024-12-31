@@ -21,7 +21,7 @@ internal sealed partial class TmdbExtensionPage : DynamicListPage
     public TmdbExtensionPage()
     {
         Icon = new(Path.Combine(AppDomain.CurrentDomain.BaseDirectory.ToString(), "Assets\\Tmdb-312x276-logo.png"));
-        Name = "TMDB Search";
+        Name = "Search Movies";
         ShowDetails = true;
     }
 
@@ -58,15 +58,12 @@ internal sealed partial class TmdbExtensionPage : DynamicListPage
         var movies = json.Results;
         _results = movies.Select(m =>
         {
-            return new ListItem(new TmdbMoviePage(m))
+            var moviePage = new TmdbMoviePage(m);
+            return new ListItem(moviePage)
             {
                 Title = $"{m.Title} ({m.ReleaseYear})",
                 Tags = [new Tag() { Text = $"{m.Vote_average:0.0}/10" }],
-                Details = new Details()
-                {
-                    Body = m.Overview ?? string.Empty,
-                    HeroImage = new($"https://image.tmdb.org/t/p/w92/{m.Poster_path}"),
-                },
+                Details = moviePage.Details,
             };
         }).ToArray();
         IsLoading = false;
@@ -84,13 +81,22 @@ internal sealed partial class TmdbMoviePage : ListPage
     private readonly MovieSearchResult _movie;
     private IListItem[] _results = [];
 
+    public Details Details { get; private set; }
+
     public TmdbMoviePage(MovieSearchResult movie)
     {
         _movie = movie;
         Name = "View";
+        ShowDetails = true;
 
         Icon = new($"https://image.tmdb.org/t/p/w92/{movie.Poster_path}");
         Title = $"{_movie.Title} ({_movie.ReleaseYear})";
+
+        Details = new Details()
+        {
+            Body = _movie.Overview ?? string.Empty,
+            HeroImage = new($"https://image.tmdb.org/t/p/w92/{_movie.Poster_path}"),
+        };
     }
 
     public override IListItem[] GetItems()
@@ -117,6 +123,13 @@ internal sealed partial class TmdbMoviePage : ListPage
 
         var movieDetails = JsonSerializer.Deserialize<MovieDetailsResponse>(content);
 
+        Details = new Details()
+        {
+            Body = _movie.Overview ?? string.Empty,
+            HeroImage = new($"https://image.tmdb.org/t/p/w92/{_movie.Poster_path}"),
+            Metadata = [new DetailsElement() { Key = "Genre", Data = new DetailsTags() { Tags = movieDetails.Genres.Select(g => new Tag() { Text = g.Name }).ToArray() } }],
+        };
+
         List<IListItem> items = [];
         var openOnTmdb = new ListItem(
             new OpenUrlCommand($"https://www.themoviedb.org/movie/{_movie.Id}")
@@ -125,6 +138,7 @@ internal sealed partial class TmdbMoviePage : ListPage
             })
         {
             Title = $"View on TMDB",
+            Details = Details,
         };
         items.Add(openOnTmdb);
 
@@ -138,6 +152,7 @@ internal sealed partial class TmdbMoviePage : ListPage
             {
                 Title = $"View stream links",
                 Subtitle = $"Streaming links provided from JustWatch.com",
+                Details = Details,
             };
             items.Add(viewStreams);
             Dictionary<string, StreamingProvider[]> all = new()
@@ -160,6 +175,7 @@ internal sealed partial class TmdbMoviePage : ListPage
                         Title = item.Provider_name,
                         Icon = new($"https://image.tmdb.org/t/p/w92/{item.Logo_path}"),
                         Tags = [tag],
+                        Details = Details,
                     };
 
                     items.Add(li);

@@ -24,7 +24,7 @@ public partial class TmdbExtensionActionsProvider : CommandProvider
     }
 
     private readonly ICommandItem[] _commands = [
-        new CommandItem(new TmdbExtensionPage()),
+        new CommandItem(new TmdbExtensionPage() { Title = "Search movies on TMDB" }),
     ];
 
     public override ICommandItem[] TopLevelCommands() => _commands;
