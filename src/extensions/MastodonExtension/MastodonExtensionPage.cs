@@ -15,6 +15,7 @@ using Microsoft.CmdPal.Extensions;
 using Microsoft.CmdPal.Extensions.Helpers;
 using Microsoft.Extensions.Configuration;
 using RestSharp;
+using Windows.Foundation;
 using Windows.Security.Credentials;
 
 namespace MastodonExtension;
@@ -53,28 +54,9 @@ internal sealed partial class MastodonExtensionPage : ListPage
     {
         foreach (var p in posts)
         {
-            List<Tag> tags = [];
-            tags.Add(new Tag()
-            {
-                Icon = p.Favorited ? new("\uE735") : new("\ue734"), // FavoriteStar
-                Text = p.Favorites.ToString(CultureInfo.CurrentCulture),
-                Foreground = p.Favorited ? ColorHelpers.FromArgb(255, 202, 143, 4) : ColorHelpers.NoColor(),
-            });
-            tags.Add(new Tag()
-            {
-                Icon = new("\uE8EB"), // Reshare, there is no filled share
-                Text = p.Boosts.ToString(CultureInfo.CurrentCulture),
-                Foreground = p.Reblogged ? ColorHelpers.FromArgb(255, 111, 112, 199) : ColorHelpers.NoColor(),
-            });
-            if (p.Replies > 0)
-            {
-                tags.Add(new Tag()
-                {
-                    Icon = new("\uE97A"), // Reply
-                    Text = p.Replies.ToString(CultureInfo.CurrentCulture),
-                });
-            }
-
+            var tags = GetTagsForPost(p);
+            var favoritePostCommand = new FavoritePostCommand(p);
+            var favPostItem = new CommandContextItem(favoritePostCommand);
             var postItem = new ListItem(new MastodonPostPage(p))
             {
                 Title = p.Account.DisplayName, // p.ContentAsPlainText(),
@@ -91,10 +73,46 @@ internal sealed partial class MastodonExtensionPage : ListPage
                 },
                 MoreCommands = [
                     new CommandContextItem(new OpenUrlCommand(p.Url) { Name = "Open on web" }),
+                    favPostItem,
                 ],
+            };
+            favoritePostCommand.FavoritedChanged += (sender, args) =>
+            {
+                postItem.Tags = GetTagsForPost(p).ToArray();
+
+                // This is to mitigate zadjii-msft/PowerToys#253
+                favPostItem.Title = favoritePostCommand.Name;
+                favPostItem.Icon = favoritePostCommand.Icon;
             };
             this._items.Add(postItem);
         }
+    }
+
+    private static List<Tag> GetTagsForPost(MastodonStatus p)
+    {
+        List<Tag> tags = [];
+        tags.Add(new Tag()
+        {
+            Icon = p.Favorited ? new("\uE735") : new("\ue734"), // FavoriteStar
+            Text = p.Favorites.ToString(CultureInfo.CurrentCulture),
+            Foreground = p.Favorited ? ColorHelpers.FromArgb(255, 202, 143, 4) : ColorHelpers.NoColor(),
+        });
+        tags.Add(new Tag()
+        {
+            Icon = new("\uE8EB"), // Reshare, there is no filled share
+            Text = p.Boosts.ToString(CultureInfo.CurrentCulture),
+            Foreground = p.Reblogged ? ColorHelpers.FromArgb(255, 111, 112, 199) : ColorHelpers.NoColor(),
+        });
+        if (p.Replies > 0)
+        {
+            tags.Add(new Tag()
+            {
+                Icon = new("\uE97A"), // Reply
+                Text = p.Replies.ToString(CultureInfo.CurrentCulture),
+            });
+        }
+
+        return tags;
     }
 
     public override IListItem[] GetItems()
@@ -523,6 +541,59 @@ public partial class MastodonPostPage : FormPage
         }
 
         return replies;
+    }
+}
+
+[System.Diagnostics.CodeAnalysis.SuppressMessage("StyleCop.CSharp.MaintainabilityRules", "SA1402:File may only contain a single type", Justification = "This is sample code")]
+public partial class FavoritePostCommand : InvokableCommand
+{
+    private readonly MastodonStatus _post;
+
+    public event TypedEventHandler<FavoritePostCommand, bool> FavoritedChanged;
+
+    public FavoritePostCommand(MastodonStatus post)
+    {
+        this._post = post;
+        UpdateName();
+    }
+
+    private void UpdateName()
+    {
+        if (_post.Favorited)
+        {
+            this.Name = "Unfavorite";
+            this.Icon = new("\uE8D9");
+        }
+        else
+        {
+            this.Name = "Favorite";
+            this.Icon = new("\uE735");
+        }
+    }
+
+    public override ICommandResult Invoke()
+    {
+        var verb = _post.Favorited ? "unfavourite" : "favourite";
+
+        var client = new RestClient("https://mastodon.social");
+        var endpoint = $"/api/v1/statuses/{_post.Id}/{verb}";
+        var request = new RestRequest(endpoint, Method.Post);
+        request.AddHeader("accept", "application/json");
+        request.AddHeader("Authorization", $"Bearer {ApiConfig.UserBearerToken}");
+
+        var task = client.ExecuteAsync(request);
+        task.ConfigureAwait(false);
+        var response = task.Result;
+        var content = response.Content;
+        if (response.IsSuccessful)
+        {
+            _post.Favorited = !_post.Favorited;
+            _post.Favorites += _post.Favorited ? 1 : -1;
+            UpdateName();
+            FavoritedChanged?.Invoke(this, _post.Favorited);
+        }
+
+        return CommandResult.KeepOpen();
     }
 }
 
