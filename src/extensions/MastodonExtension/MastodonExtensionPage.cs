@@ -53,6 +53,28 @@ internal sealed partial class MastodonExtensionPage : ListPage
     {
         foreach (var p in posts)
         {
+            List<Tag> tags = [];
+            tags.Add(new Tag()
+            {
+                Icon = p.Favorited ? new("\uE735") : new("\ue734"), // FavoriteStar
+                Text = p.Favorites.ToString(CultureInfo.CurrentCulture),
+                Foreground = p.Favorited ? ColorHelpers.FromArgb(255, 202, 143, 4) : ColorHelpers.NoColor(),
+            });
+            tags.Add(new Tag()
+            {
+                Icon = new("\uE8EB"), // Reshare, there is no filled share
+                Text = p.Boosts.ToString(CultureInfo.CurrentCulture),
+                Foreground = p.Reblogged ? ColorHelpers.FromArgb(255, 111, 112, 199) : ColorHelpers.NoColor(),
+            });
+            if (p.Replies > 0)
+            {
+                tags.Add(new Tag()
+                {
+                    Icon = new("\uE97A"), // Reply
+                    Text = p.Replies.ToString(CultureInfo.CurrentCulture),
+                });
+            }
+
             var postItem = new ListItem(new MastodonPostPage(p))
             {
                 Title = p.Account.DisplayName, // p.ContentAsPlainText(),
@@ -60,18 +82,7 @@ internal sealed partial class MastodonExtensionPage : ListPage
                 Icon = new(p.Account.Avatar),
 
                 // *
-                Tags = [
-                    new Tag()
-                    {
-                        Icon = new("\ue734"), // FavoriteStar
-                        Text = p.Favorites.ToString(CultureInfo.CurrentCulture),
-                    },
-                    new Tag()
-                    {
-                        Icon = new("\ue8ee"), // RepeatAll
-                        Text = p.Boosts.ToString(CultureInfo.CurrentCulture),
-                    },
-                ], // */
+                Tags = tags.ToArray(), // */
                 Details = new Details()
                 {
                     // It was a cool idea to have a single image as the HeroImage, but the scaling is terrible
@@ -90,6 +101,25 @@ internal sealed partial class MastodonExtensionPage : ListPage
     {
         if (_items.Count == 0)
         {
+            if (_needsLogin & !ApiConfig.HasUserToken)
+            {
+                this.HasMoreItems = false;
+                this._items.Clear();
+                var loginPage = new MastodonLoginPage();
+                var item = new ListItem(loginPage)
+                {
+                    Title = "Login to Mastodon",
+                    Subtitle = "You need to login before you can view your home timeline",
+                };
+
+                // this._items.Add(item);
+                return [item];
+            }
+            else
+            {
+                this.HasMoreItems = true;
+            }
+
             var postsAsync = FetchExplorePage();
             postsAsync.ConfigureAwait(false);
             var posts = postsAsync.Result;

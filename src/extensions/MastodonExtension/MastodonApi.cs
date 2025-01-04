@@ -41,6 +41,12 @@ public class MastodonStatus
     [JsonPropertyName("replies_count")]
     public int Replies { get; set; }
 
+    [JsonPropertyName("favourited")]
+    public bool Favorited { get; set; }
+
+    [JsonPropertyName("reblogged")]
+    public bool Reblogged { get; set; }
+
     [JsonPropertyName("media_attachments")]
     public List<MediaAttachment> MediaAttachments { get; set; }
 
@@ -112,6 +118,9 @@ public class MastodonStatus
 [System.Diagnostics.CodeAnalysis.SuppressMessage("StyleCop.CSharp.MaintainabilityRules", "SA1402:File may only contain a single type", Justification = "This is sample code")]
 public class MastodonAccount
 {
+    [JsonPropertyName("id")]
+    public string Id { get; set; }
+
     [JsonPropertyName("username")]
     public string Username { get; set; }
 
@@ -120,6 +129,12 @@ public class MastodonAccount
 
     [JsonPropertyName("avatar")]
     public string Avatar { get; set; }
+
+    [JsonPropertyName("url")]
+    public string Url { get; set; }
+
+    [JsonPropertyName("bot")]
+    public bool IsBot { get; set; }
 }
 
 [System.Diagnostics.CodeAnalysis.SuppressMessage("StyleCop.CSharp.MaintainabilityRules", "SA1402:File may only contain a single type", Justification = "This is sample code")]
