@@ -15,6 +15,7 @@ using Microsoft.CmdPal.Extensions;
 using Microsoft.CmdPal.Extensions.Helpers;
 using Microsoft.Extensions.Configuration;
 using RestSharp;
+using Windows.Security.Credentials;
 
 namespace MastodonExtension;
 
@@ -34,18 +35,18 @@ internal sealed partial class MastodonExtensionPage : ListPage
 
     public MastodonExtensionPage(bool isExplorePage = true)
     {
+        _statusesUrl = isExplorePage ? ExploreUrl : HomeUrl;
+        _needsLogin = !isExplorePage;
+
         Icon = new("https://mastodon.social/packs/media/icons/android-chrome-36x36-4c61fdb42936428af85afdbf8c6a45a8.png");
         Name = "Mastodon";
-        Title = "Explore";
+        Title = isExplorePage ? "Explore" : "Home";
         ShowDetails = true;
         HasMoreItems = true;
         IsLoading = true;
 
         // #6364ff
         AccentColor = ColorHelpers.FromRgb(99, 100, 255);
-
-        _statusesUrl = isExplorePage ? ExploreUrl : HomeUrl;
-        _needsLogin = !isExplorePage;
     }
 
     private void AddPosts(List<MastodonStatus> posts)
@@ -130,6 +131,11 @@ internal sealed partial class MastodonExtensionPage : ListPage
         if (_needsLogin && !ApiConfig.HasUserToken)
         {
             await ApiConfig.GetUserToken();
+
+            if (!ApiConfig.IsLoggedIn)
+            {
+                return statuses;
+            }
         }
 
         try
@@ -160,6 +166,9 @@ internal sealed partial class MastodonExtensionPage : ListPage
 [System.Diagnostics.CodeAnalysis.SuppressMessage("StyleCop.CSharp.MaintainabilityRules", "SA1402:File may only contain a single type", Justification = "This is sample code")]
 public partial class ApiConfig
 {
+    public static readonly string PasswordVaultResourceName = "MastodonExtensionKeys";
+    public static readonly string PasswordVaultUserCodeName = "UserCodeKey";
+
     public static string ClientId { get; private set; } = string.Empty;
 
     public static string ClientSecret { get; private set; } = string.Empty;
@@ -168,7 +177,7 @@ public partial class ApiConfig
 
     public static string UserBearerToken { get; private set; } = string.Empty;
 
-    public static string UserAuthorizationCode { get; set; } = string.Empty;
+    public static string UserAuthorizationCode { get; private set; } = string.Empty;
 
     public static bool IsLoggedIn => !string.IsNullOrEmpty(UserAuthorizationCode);
 
@@ -208,20 +217,80 @@ public partial class ApiConfig
 
     public static async Task GetUserToken()
     {
-        var options = new RestClientOptions($"https://mastodon.social/oauth/token");
-        var client = new RestClient(options);
-        var request = new RestRequest(string.Empty);
+        // var options = new RestClientOptions($"https://mastodon.social/oauth/token");
+        var client = new RestClient("https://mastodon.social");
+        var endpoint = "/oauth/token";
+        var request = new RestRequest(endpoint, Method.Post);
         request.AddHeader("accept", "application/json");
-        request.AddHeader("client_id", $"{ApiConfig.ClientId}");
-        request.AddHeader("client_secret", $"{ApiConfig.ClientSecret}");
-        request.AddHeader("redirect_uri", "urn:ietf:wg:oauth:2.0:oob");
-        request.AddHeader("grant_type", "authorization_code");
-        request.AddHeader("code", $"{ApiConfig.UserAuthorizationCode}");
-        request.AddHeader("scope", "read write push");
-        var response = await client.PostAsync(request);
+        request.AddHeader("Content-Type", "application/x-www-form-urlencoded");
+
+        request.AddParameter("client_id", $"{ApiConfig.ClientId}");
+        request.AddParameter("client_secret", $"{ApiConfig.ClientSecret}");
+        request.AddParameter("redirect_uri", "urn:ietf:wg:oauth:2.0:oob");
+        request.AddParameter("grant_type", "authorization_code");
+        request.AddParameter("code", $"{ApiConfig.UserAuthorizationCode}");
+        request.AddParameter("scope", "read write push");
+        var response = await client.ExecuteAsync(request);
         var content = response.Content;
-        var authToken = JsonSerializer.Deserialize<UserAuthToken>(content);
-        ApiConfig.UserBearerToken = authToken.AccessToken;
+        try
+        {
+            var authToken = JsonSerializer.Deserialize<UserAuthToken>(content);
+            if (authToken == null || authToken.AccessToken == null)
+            {
+                ApiConfig.LogOutUser();
+            }
+            else
+            {
+                ApiConfig.UserBearerToken = authToken.AccessToken;
+            }
+        }
+        catch (Exception)
+        {
+            ApiConfig.LogOutUser();
+        }
+    }
+
+    public static void LoginUser(string code)
+    {
+        var vault = new PasswordVault();
+        var userAuthCode = new PasswordCredential()
+        {
+            Resource = ApiConfig.PasswordVaultResourceName,
+            UserName = ApiConfig.PasswordVaultUserCodeName,
+            Password = code,
+        };
+        vault.Add(userAuthCode);
+    }
+
+    public static void LogOutUser()
+    {
+        var vault = new PasswordVault();
+        var userAuthCode = new PasswordCredential()
+        {
+            Resource = ApiConfig.PasswordVaultResourceName,
+            UserName = ApiConfig.PasswordVaultUserCodeName,
+            Password = ApiConfig.UserAuthorizationCode,
+        };
+        vault.Remove(userAuthCode);
+        UserAuthorizationCode = null;
+        UserBearerToken = null;
+    }
+
+    static ApiConfig()
+    {
+        var vault = new PasswordVault();
+        try
+        {
+            var savedClientCode = vault.Retrieve(PasswordVaultResourceName, PasswordVaultUserCodeName);
+            if (savedClientCode != null)
+            {
+                UserAuthorizationCode = savedClientCode.Password;
+            }
+        }
+        catch (Exception)
+        {
+            // log?
+        }
     }
 }
 
@@ -242,17 +311,19 @@ public partial class MastodonExtensionActionsProvider : CommandProvider
         _loginItem = new CommandItem(new MastodonLoginPage());
         _exploreItem = new CommandItem(new MastodonExtensionPage(isExplorePage: true))
         {
+            Title = "Explore Mastodon",
             Subtitle = "Explore top posts on mastodon.social",
         };
         _homeItem = new CommandItem(new MastodonExtensionPage(isExplorePage: false))
         {
-            Subtitle = "Explore top posts on mastodon.social",
+            Title = "Mastodon",
+            Subtitle = "Posts from users and tags you follow on Mastodon",
         };
     }
 
     public override ICommandItem[] TopLevelCommands()
     {
-        if (ApiConfig.HasUserToken)
+        if (ApiConfig.IsLoggedIn)
         {
             return [_homeItem, _exploreItem];
         }
@@ -430,7 +501,9 @@ public partial class MastodonLoginForm : Form
         if (formInput.TryGetPropertyValue("Token", out var code))
         {
             var codeString = code.ToString();
-            ApiConfig.UserAuthorizationCode = codeString;
+            ApiConfig.LoginUser(codeString);
+
+            // ApiConfig.UserAuthorizationCode = codeString;
         }
 
         return CommandResult.GoHome();
