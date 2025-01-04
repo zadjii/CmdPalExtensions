@@ -1,4 +1,4 @@
-<Project Sdk="Microsoft.NET.Sdk">
+﻿<Project Sdk="Microsoft.NET.Sdk">
   <Import Project="..\..\Common.Dotnet.CsWinRT.props" />
   <PropertyGroup>
     <OutputType>WinExe</OutputType>
@@ -11,6 +11,7 @@
     <AppendTargetFrameworkToOutputPath>false</AppendTargetFrameworkToOutputPath>
     <AppendRuntimeIdentifierToOutputPath>false</AppendRuntimeIdentifierToOutputPath>
     <GenerateAppxPackageOnBuild>true</GenerateAppxPackageOnBuild>
+    <UserSecretsId>efe78e2f-9ee6-4e18-a37e-165c62f70a1b</UserSecretsId>
   </PropertyGroup>
 
   <ItemGroup>
@@ -37,6 +38,9 @@
     <PackageReference Include="Microsoft.CmdPal.Extensions.SDK" />
     <PackageReference Include="Microsoft.WindowsAppSDK" />
     <PackageReference Include="Microsoft.Web.WebView2" /> 
+    
+    <PackageReference Include="Microsoft.Extensions.Configuration.UserSecrets" />
+    <PackageReference Include="RestSharp" />
   </ItemGroup>
 
   <!--

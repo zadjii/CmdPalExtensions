@@ -5,36 +5,47 @@
 using System;
 using System.Collections.Generic;
 using System.Globalization;
+using System.IO;
 using System.Linq;
 using System.Net.Http;
-using System.Text;
 using System.Text.Json;
-using System.Text.Json.Serialization;
+using System.Text.Json.Nodes;
 using System.Threading.Tasks;
-using HtmlAgilityPack;
 using Microsoft.CmdPal.Extensions;
 using Microsoft.CmdPal.Extensions.Helpers;
+using Microsoft.Extensions.Configuration;
+using RestSharp;
 
 namespace MastodonExtension;
 
 [System.Diagnostics.CodeAnalysis.SuppressMessage("StyleCop.CSharp.MaintainabilityRules", "SA1402:File may only contain a single type", Justification = "This is sample code")]
 internal sealed partial class MastodonExtensionPage : ListPage
 {
+    public static readonly string ExploreUrl = "https://mastodon.social/api/v1/trends/statuses";
+    public static readonly string HomeUrl = "https://mastodon.social/api/v1/timelines/home";
+
     internal static readonly HttpClient Client = new();
     internal static readonly JsonSerializerOptions Options = new() { PropertyNameCaseInsensitive = true };
 
     private readonly List<ListItem> _items = [];
 
-    public MastodonExtensionPage()
+    private readonly string _statusesUrl = string.Empty;
+    private readonly bool _needsLogin;
+
+    public MastodonExtensionPage(bool isExplorePage = true)
     {
         Icon = new("https://mastodon.social/packs/media/icons/android-chrome-36x36-4c61fdb42936428af85afdbf8c6a45a8.png");
         Name = "Mastodon";
+        Title = "Explore";
         ShowDetails = true;
         HasMoreItems = true;
         IsLoading = true;
 
         // #6364ff
         AccentColor = ColorHelpers.FromRgb(99, 100, 255);
+
+        _statusesUrl = isExplorePage ? ExploreUrl : HomeUrl;
+        _needsLogin = !isExplorePage;
     }
 
     private void AddPosts(List<MastodonStatus> posts)
@@ -110,15 +121,29 @@ internal sealed partial class MastodonExtensionPage : ListPage
     {
         var statuses = new List<MastodonStatus>();
 
+        if (_needsLogin && !ApiConfig.IsLoggedIn)
+        {
+            // TODO! ShowMessage & bail
+            return statuses;
+        }
+
+        if (_needsLogin && !ApiConfig.HasUserToken)
+        {
+            await ApiConfig.GetUserToken();
+        }
+
         try
         {
             // Make a GET request to the Mastodon trends API endpoint
-            var response = await Client
-                .GetAsync($"https://mastodon.social/api/v1/trends/statuses?limit={limit}&offset={offset}");
-            response.EnsureSuccessStatusCode();
+            var options = new RestClientOptions($"{_statusesUrl}?limit={limit}&offset={offset}");
+            var client = new RestClient(options);
+            var request = new RestRequest(string.Empty);
+            request.AddHeader("accept", "application/json");
+            request.AddHeader("Authorization", $"Bearer {ApiConfig.UserBearerToken}");
+            var response = await client.GetAsync(request);
 
             // Read and deserialize the response JSON into a list of MastodonStatus objects
-            var responseBody = await response.Content.ReadAsStringAsync();
+            var responseBody = response.Content;
             statuses = JsonSerializer.Deserialize<List<MastodonStatus>>(responseBody, Options);
         }
         catch (Exception e)
@@ -133,18 +158,110 @@ internal sealed partial class MastodonExtensionPage : ListPage
 }
 
 [System.Diagnostics.CodeAnalysis.SuppressMessage("StyleCop.CSharp.MaintainabilityRules", "SA1402:File may only contain a single type", Justification = "This is sample code")]
+public partial class ApiConfig
+{
+    public static string ClientId { get; private set; } = string.Empty;
+
+    public static string ClientSecret { get; private set; } = string.Empty;
+
+    public static string AppBearerToken { get; private set; } = string.Empty;
+
+    public static string UserBearerToken { get; private set; } = string.Empty;
+
+    public static string UserAuthorizationCode { get; set; } = string.Empty;
+
+    public static bool IsLoggedIn => !string.IsNullOrEmpty(UserAuthorizationCode);
+
+    public static bool HasUserToken => !string.IsNullOrEmpty(UserBearerToken);
+
+    public void SetupApiKeys()
+    {
+        // See:
+        // * https://techcommunity.microsoft.com/t5/apps-on-azure-blog/how-to-store-app-secrets-for-your-asp-net-core-project/ba-p/1527531
+        // * https://stackoverflow.com/a/62972670/1481137
+        var builder = new ConfigurationBuilder()
+            .SetBasePath(Directory.GetCurrentDirectory())
+            .AddUserSecrets<MastodonExtensionActionsProvider>();
+
+        var config = builder.Build();
+        var secretProvider = config.Providers.First();
+        secretProvider.TryGet("keys:client_id", out var client_id);
+
+        // Todo! probably throw if we fail here
+        if (client_id == null)
+        {
+            throw new InvalidDataException("Somehow, I failed to package the token into the app");
+        }
+
+        ClientId = client_id;
+
+        secretProvider.TryGet("keys:client_secret", out var client_secret);
+
+        // Todo! probably throw if we fail here
+        if (client_secret == null)
+        {
+            throw new InvalidDataException("Somehow, I failed to package the token into the app");
+        }
+
+        ClientSecret = client_secret;
+    }
+
+    public static async Task GetUserToken()
+    {
+        var options = new RestClientOptions($"https://mastodon.social/oauth/token");
+        var client = new RestClient(options);
+        var request = new RestRequest(string.Empty);
+        request.AddHeader("accept", "application/json");
+        request.AddHeader("client_id", $"{ApiConfig.ClientId}");
+        request.AddHeader("client_secret", $"{ApiConfig.ClientSecret}");
+        request.AddHeader("redirect_uri", "urn:ietf:wg:oauth:2.0:oob");
+        request.AddHeader("grant_type", "authorization_code");
+        request.AddHeader("code", $"{ApiConfig.UserAuthorizationCode}");
+        request.AddHeader("scope", "read write push");
+        var response = await client.PostAsync(request);
+        var content = response.Content;
+        var authToken = JsonSerializer.Deserialize<UserAuthToken>(content);
+        ApiConfig.UserBearerToken = authToken.AccessToken;
+    }
+}
+
+[System.Diagnostics.CodeAnalysis.SuppressMessage("StyleCop.CSharp.MaintainabilityRules", "SA1402:File may only contain a single type", Justification = "This is sample code")]
 public partial class MastodonExtensionActionsProvider : CommandProvider
 {
+    public static ApiConfig Config { get; } = new();
+
+    private readonly CommandItem _loginItem;
+    private readonly CommandItem _exploreItem;
+    private readonly CommandItem _homeItem;
+
     public MastodonExtensionActionsProvider()
     {
         DisplayName = "Mastodon extension for cmdpal Commands";
+        Config.SetupApiKeys();
+
+        _loginItem = new CommandItem(new MastodonLoginPage());
+        _exploreItem = new CommandItem(new MastodonExtensionPage(isExplorePage: true))
+        {
+            Subtitle = "Explore top posts on mastodon.social",
+        };
+        _homeItem = new CommandItem(new MastodonExtensionPage(isExplorePage: false))
+        {
+            Subtitle = "Explore top posts on mastodon.social",
+        };
     }
 
-    private readonly ICommandItem[] _actions = [
-        new CommandItem(new MastodonExtensionPage()) { Subtitle = "Explore top posts on mastodon.social" },
-    ];
-
-    public override ICommandItem[] TopLevelCommands() => _actions;
+    public override ICommandItem[] TopLevelCommands()
+    {
+        if (ApiConfig.HasUserToken)
+        {
+            return [_homeItem, _exploreItem];
+        }
+        else
+        {
+            ExtensionHost.LogMessage(new LogMessage() { Message = "User was not logged in" });
+            return [_loginItem, _exploreItem];
+        }
+    }
 }
 
 [System.Diagnostics.CodeAnalysis.SuppressMessage("StyleCop.CSharp.MaintainabilityRules", "SA1402:File may only contain a single type", Justification = "This is sample code")]
@@ -301,141 +418,83 @@ public partial class MastodonPostPage : FormPage
 }
 
 [System.Diagnostics.CodeAnalysis.SuppressMessage("StyleCop.CSharp.MaintainabilityRules", "SA1402:File may only contain a single type", Justification = "This is sample code")]
-public class MastodonStatus
+public partial class MastodonLoginForm : Form
 {
-    [JsonPropertyName("id")]
-    public string Id { get; set; }
-
-    [JsonPropertyName("content")]
-    public string Content { get; set; }
-
-    [JsonPropertyName("url")]
-    public string Url { get; set; }
-
-    [JsonPropertyName("uri")]
-    public string Uri { get; set; }
-
-    [JsonPropertyName("created_at")]
-    public DateTime CreatedAt { get; set; }
-
-    [JsonPropertyName("account")]
-    public MastodonAccount Account { get; set; }
-
-    [JsonPropertyName("favourites_count")]
-    public int Favorites { get; set; }
-
-    [JsonPropertyName("reblogs_count")]
-    public int Boosts { get; set; }
-
-    [JsonPropertyName("replies_count")]
-    public int Replies { get; set; }
-
-    [JsonPropertyName("media_attachments")]
-    public List<MediaAttachment> MediaAttachments { get; set; }
-
-    public string ContentAsPlainText()
+    public MastodonLoginForm()
     {
-        var doc = new HtmlDocument();
-        doc.LoadHtml(Content);
-        var plainTextBuilder = new StringBuilder();
-        foreach (var node in doc.DocumentNode.ChildNodes)
-        {
-            plainTextBuilder.Append(ParseNodeToPlaintext(node));
-        }
-
-        return plainTextBuilder.ToString();
     }
 
-    public string ContentAsMarkdown(bool escapeHashtags, bool addMedia)
+    public override ICommandResult SubmitForm(string payload)
     {
-        var doc = new HtmlDocument();
-        doc.LoadHtml(Content.Replace("<br>", "\n\n").Replace("<br />", "\n\n"));
-        var markdownBuilder = new StringBuilder();
-        foreach (var node in doc.DocumentNode.ChildNodes)
+        var formInput = JsonNode.Parse(payload)?.AsObject();
+        if (formInput.TryGetPropertyValue("Token", out var code))
         {
-            markdownBuilder.Append(ParseNodeToMarkdown(node, escapeHashtags));
+            var codeString = code.ToString();
+            ApiConfig.UserAuthorizationCode = codeString;
         }
 
-        // change this to >1 if you want to try the HeroImage thing
-        if (addMedia && MediaAttachments.Count > 0)
+        return CommandResult.GoHome();
+    }
+
+    public override string TemplateJson()
+    {
+        return $$"""
+{
+    "$schema": "http://adaptivecards.io/schemas/adaptive-card.json",
+    "type": "AdaptiveCard",
+    "version": "1.6",
+    "body": [
         {
-            foreach (var mediaAttachment in MediaAttachments)
-            {
-                // A newline in a img tag blows up the image parser :upside_down:
-                var desc = mediaAttachment.Description ?? string.Empty;
-                var img = $"\n![{desc.Replace("\n", " ")}]({mediaAttachment.Url})";
-                markdownBuilder.Append(img);
+            "type": "TextBlock",
+            "size": "Medium",
+            "weight": "Bolder",
+            "text": " Login to Mastodon",
+            "horizontalAlignment": "Center",
+            "wrap": true,
+            "style": "heading"
+        },
+        {
+            "type": "TextBlock",
+            "label": "Username",
+            "isRequired": true,
+            "errorMessage": "Username is required",
+            "text": "Login using the browser window, then copy and paste the token into this page."
+        },
+        {
+            "type": "Input.Text",
+            "id": "Token",
+            "style": "Password",
+            "label": "Token",
+            "isRequired": true,
+            "errorMessage": "Token is required"
+        }
+    ],
+    "actions": [
+        {
+            "type": "Action.Submit",
+            "title": "Login",
+            "data": {
+                "id": "Token"
             }
         }
-
-        return markdownBuilder.ToString();
+    ]
+}
+""";
     }
+}
 
-    private static string ParseNodeToMarkdown(HtmlNode node, bool escapeHashtags)
+[System.Diagnostics.CodeAnalysis.SuppressMessage("StyleCop.CSharp.MaintainabilityRules", "SA1402:File may only contain a single type", Justification = "This is sample code")]
+public partial class MastodonLoginPage : FormPage
+{
+    public MastodonLoginPage()
     {
-        var innerText = escapeHashtags ? node.InnerText.Replace("#", "\\#") : node.InnerText;
-        switch (node.Name)
-        {
-            case "strong":
-            case "b":
-                return $"**{node.InnerText}**";
-            case "em":
-            case "i":
-                return $"*{node.InnerText}*";
-            case "a":
-                return $"[{node.InnerText}]({node.GetAttributeValue("href", "#")})";
-            case "p":
-                return $"{innerText}\n\n";
-            case "li":
-                return $"{innerText}\n";
-            case "#text":
-                return innerText;
-            default:
-                return innerText;  // For unhandled nodes, just return the text.
-        }
+        Name = "Login";
+        Title = "Login to Mastodon";
+        Icon = new("https://mastodon.social/packs/media/icons/android-chrome-36x36-4c61fdb42936428af85afdbf8c6a45a8.png");
+
+        // #6364ff
+        AccentColor = ColorHelpers.FromRgb(99, 100, 255);
     }
 
-    private static string ParseNodeToPlaintext(HtmlNode node) => node.InnerText;
-}
-
-[System.Diagnostics.CodeAnalysis.SuppressMessage("StyleCop.CSharp.MaintainabilityRules", "SA1402:File may only contain a single type", Justification = "This is sample code")]
-public class MastodonAccount
-{
-    [JsonPropertyName("username")]
-    public string Username { get; set; }
-
-    [JsonPropertyName("display_name")]
-    public string DisplayName { get; set; }
-
-    [JsonPropertyName("avatar")]
-    public string Avatar { get; set; }
-}
-
-[System.Diagnostics.CodeAnalysis.SuppressMessage("StyleCop.CSharp.MaintainabilityRules", "SA1402:File may only contain a single type", Justification = "This is sample code")]
-public class MediaAttachment
-{
-    [JsonPropertyName("id")]
-    public string Id { get; set; }
-
-    [JsonPropertyName("type")]
-    public string Type { get; set; } // e.g., "image", "video", "gifv", etc.
-
-    [JsonPropertyName("url")]
-    public string Url { get; set; }
-
-    [JsonPropertyName("preview_url")]
-    public string PreviewUrl { get; set; }
-
-    [JsonPropertyName("description")]
-    public string Description { get; set; } = string.Empty;
-}
-
-[System.Diagnostics.CodeAnalysis.SuppressMessage("StyleCop.CSharp.MaintainabilityRules", "SA1402:File may only contain a single type", Justification = "This is sample code")]
-public class MastodonContext
-{
-    [JsonPropertyName("ancestors")]
-    public List<MastodonStatus> Ancestors { get; set; }
-
-    [JsonPropertyName("descendants")]
-    public List<MastodonStatus> Descendants { get; set; }
+    public override IForm[] Forms() => [new MastodonLoginForm()];
 }
