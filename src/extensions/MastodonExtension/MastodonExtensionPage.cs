@@ -122,20 +122,10 @@ internal sealed partial class MastodonExtensionPage : ListPage
     {
         var statuses = new List<MastodonStatus>();
 
-        if (_needsLogin && !ApiConfig.IsLoggedIn)
+        if (_needsLogin && !ApiConfig.HasUserToken)
         {
             // TODO! ShowMessage & bail
             return statuses;
-        }
-
-        if (_needsLogin && !ApiConfig.HasUserToken)
-        {
-            await ApiConfig.GetUserToken();
-
-            if (!ApiConfig.IsLoggedIn)
-            {
-                return statuses;
-            }
         }
 
         try
@@ -177,10 +167,9 @@ public partial class ApiConfig
 
     public static string UserBearerToken { get; private set; } = string.Empty;
 
-    public static string UserAuthorizationCode { get; private set; } = string.Empty;
+    // public static string UserAuthorizationCode { get; private set; } = string.Empty;
 
-    public static bool IsLoggedIn => !string.IsNullOrEmpty(UserAuthorizationCode);
-
+    // public static bool IsLoggedIn => !string.IsNullOrEmpty(UserAuthorizationCode);
     public static bool HasUserToken => !string.IsNullOrEmpty(UserBearerToken);
 
     public void SetupApiKeys()
@@ -215,7 +204,7 @@ public partial class ApiConfig
         ClientSecret = client_secret;
     }
 
-    public static async Task GetUserToken()
+    private static async Task GetUserToken(string authCode)
     {
         // var options = new RestClientOptions($"https://mastodon.social/oauth/token");
         var client = new RestClient("https://mastodon.social");
@@ -228,7 +217,7 @@ public partial class ApiConfig
         request.AddParameter("client_secret", $"{ApiConfig.ClientSecret}");
         request.AddParameter("redirect_uri", "urn:ietf:wg:oauth:2.0:oob");
         request.AddParameter("grant_type", "authorization_code");
-        request.AddParameter("code", $"{ApiConfig.UserAuthorizationCode}");
+        request.AddParameter("code", $"{authCode}");
         request.AddParameter("scope", "read write push");
         var response = await client.ExecuteAsync(request);
         var content = response.Content;
@@ -237,7 +226,9 @@ public partial class ApiConfig
             var authToken = JsonSerializer.Deserialize<UserAuthToken>(content);
             if (authToken == null || authToken.AccessToken == null)
             {
-                ApiConfig.LogOutUser();
+                // it no worky?
+
+                // ApiConfig.LogOutUser();
             }
             else
             {
@@ -250,29 +241,41 @@ public partial class ApiConfig
         }
     }
 
-    public static void LoginUser(string code)
+    public static async Task LoginUser(string code)
     {
+        await GetUserToken(code);
+
+        if (string.IsNullOrEmpty(ApiConfig.UserBearerToken))
+        {
+            return;
+        }
+
         var vault = new PasswordVault();
-        var userAuthCode = new PasswordCredential()
+        var userToken = new PasswordCredential()
         {
             Resource = ApiConfig.PasswordVaultResourceName,
             UserName = ApiConfig.PasswordVaultUserCodeName,
-            Password = code,
+            Password = ApiConfig.UserBearerToken,
         };
-        vault.Add(userAuthCode);
+        vault.Add(userToken);
     }
 
     public static void LogOutUser()
     {
+        if (string.IsNullOrEmpty(ApiConfig.UserBearerToken))
+        {
+            return;
+        }
+
         var vault = new PasswordVault();
         var userAuthCode = new PasswordCredential()
         {
             Resource = ApiConfig.PasswordVaultResourceName,
             UserName = ApiConfig.PasswordVaultUserCodeName,
-            Password = ApiConfig.UserAuthorizationCode,
+            Password = ApiConfig.UserBearerToken,
         };
         vault.Remove(userAuthCode);
-        UserAuthorizationCode = null;
+
         UserBearerToken = null;
     }
 
@@ -284,7 +287,7 @@ public partial class ApiConfig
             var savedClientCode = vault.Retrieve(PasswordVaultResourceName, PasswordVaultUserCodeName);
             if (savedClientCode != null)
             {
-                UserAuthorizationCode = savedClientCode.Password;
+                UserBearerToken = savedClientCode.Password;
             }
         }
         catch (Exception)
@@ -302,6 +305,7 @@ public partial class MastodonExtensionActionsProvider : CommandProvider
     private readonly CommandItem _loginItem;
     private readonly CommandItem _exploreItem;
     private readonly CommandItem _homeItem;
+    private readonly CommandItem _logoutItem;
 
     public MastodonExtensionActionsProvider()
     {
@@ -319,13 +323,17 @@ public partial class MastodonExtensionActionsProvider : CommandProvider
             Title = "Mastodon",
             Subtitle = "Posts from users and tags you follow on Mastodon",
         };
+        _logoutItem = new CommandItem(new LogoutCommand())
+        {
+            Subtitle = "Log out of Mastodon",
+        };
     }
 
     public override ICommandItem[] TopLevelCommands()
     {
-        if (ApiConfig.IsLoggedIn)
+        if (ApiConfig.HasUserToken)
         {
-            return [_homeItem, _exploreItem];
+            return [_homeItem, _exploreItem, _logoutItem];
         }
         else
         {
@@ -501,7 +509,7 @@ public partial class MastodonLoginForm : Form
         if (formInput.TryGetPropertyValue("Token", out var code))
         {
             var codeString = code.ToString();
-            ApiConfig.LoginUser(codeString);
+            _ = ApiConfig.LoginUser(codeString).ConfigureAwait(false);
 
             // ApiConfig.UserAuthorizationCode = codeString;
         }
@@ -570,4 +578,20 @@ public partial class MastodonLoginPage : FormPage
     }
 
     public override IForm[] Forms() => [new MastodonLoginForm()];
+}
+
+[System.Diagnostics.CodeAnalysis.SuppressMessage("StyleCop.CSharp.MaintainabilityRules", "SA1402:File may only contain a single type", Justification = "This is sample code")]
+public partial class LogoutCommand : InvokableCommand
+{
+    public LogoutCommand()
+    {
+        Name = "Logout";
+        Icon = new("\uF3B1");
+    }
+
+    public override ICommandResult Invoke()
+    {
+        ApiConfig.LogOutUser();
+        return CommandResult.GoHome();
+    }
 }
