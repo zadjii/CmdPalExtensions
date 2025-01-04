@@ -57,6 +57,9 @@ internal sealed partial class MastodonExtensionPage : ListPage
             var tags = GetTagsForPost(p);
             var favoritePostCommand = new FavoritePostCommand(p);
             var favPostItem = new CommandContextItem(favoritePostCommand);
+            var boostPostCommand = new BoostPostCommand(p);
+            var boostPostItem = new CommandContextItem(boostPostCommand);
+
             var postItem = new ListItem(new MastodonPostPage(p))
             {
                 Title = p.Account.DisplayName, // p.ContentAsPlainText(),
@@ -74,6 +77,7 @@ internal sealed partial class MastodonExtensionPage : ListPage
                 MoreCommands = [
                     new CommandContextItem(new OpenUrlCommand(p.Url) { Name = "Open on web" }),
                     favPostItem,
+                    boostPostItem,
                 ],
             };
             favoritePostCommand.FavoritedChanged += (sender, args) =>
@@ -83,6 +87,14 @@ internal sealed partial class MastodonExtensionPage : ListPage
                 // This is to mitigate zadjii-msft/PowerToys#253
                 favPostItem.Title = favoritePostCommand.Name;
                 favPostItem.Icon = favoritePostCommand.Icon;
+            };
+            boostPostCommand.BoostedChanged += (sender, args) =>
+            {
+                postItem.Tags = GetTagsForPost(p).ToArray();
+
+                // This is to mitigate zadjii-msft/PowerToys#253
+                boostPostItem.Title = boostPostCommand.Name;
+                boostPostItem.Icon = boostPostCommand.Icon;
             };
             this._items.Add(postItem);
         }
@@ -591,6 +603,59 @@ public partial class FavoritePostCommand : InvokableCommand
             _post.Favorites += _post.Favorited ? 1 : -1;
             UpdateName();
             FavoritedChanged?.Invoke(this, _post.Favorited);
+        }
+
+        return CommandResult.KeepOpen();
+    }
+}
+
+[System.Diagnostics.CodeAnalysis.SuppressMessage("StyleCop.CSharp.MaintainabilityRules", "SA1402:File may only contain a single type", Justification = "This is sample code")]
+public partial class BoostPostCommand : InvokableCommand
+{
+    private readonly MastodonStatus _post;
+
+    public event TypedEventHandler<BoostPostCommand, bool> BoostedChanged;
+
+    public BoostPostCommand(MastodonStatus post)
+    {
+        this._post = post;
+        UpdateName();
+    }
+
+    private void UpdateName()
+    {
+        if (_post.Reblogged)
+        {
+            this.Name = "Unboost";
+            this.Icon = new("\uE7A7"); // undo
+        }
+        else
+        {
+            this.Name = "Boost";
+            this.Icon = new("\uE8EB"); // reshare
+        }
+    }
+
+    public override ICommandResult Invoke()
+    {
+        var verb = _post.Reblogged ? "unreblog" : "reblog";
+
+        var client = new RestClient("https://mastodon.social");
+        var endpoint = $"/api/v1/statuses/{_post.Id}/{verb}";
+        var request = new RestRequest(endpoint, Method.Post);
+        request.AddHeader("accept", "application/json");
+        request.AddHeader("Authorization", $"Bearer {ApiConfig.UserBearerToken}");
+
+        var task = client.ExecuteAsync(request);
+        task.ConfigureAwait(false);
+        var response = task.Result;
+        var content = response.Content;
+        if (response.IsSuccessful)
+        {
+            _post.Reblogged = !_post.Reblogged;
+            _post.Boosts += _post.Reblogged ? 1 : -1;
+            UpdateName();
+            BoostedChanged?.Invoke(this, _post.Reblogged);
         }
 
         return CommandResult.KeepOpen();
