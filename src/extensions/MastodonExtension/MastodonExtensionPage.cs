@@ -519,6 +519,8 @@ public partial class MastodonLoginForm : Form
 
     public override string TemplateJson()
     {
+        var browserUrl = $"https://mastodon.social/oauth/authorize?client_id={ApiConfig.ClientId}&scope=read+write+push&redirect_uri=urn:ietf:wg:oauth:2.0:oob&response_type=code";
+
         return $$"""
 {
     "$schema": "http://adaptivecards.io/schemas/adaptive-card.json",
@@ -551,6 +553,11 @@ public partial class MastodonLoginForm : Form
         }
     ],
     "actions": [
+        {
+            "type": "Action.OpenUrl",
+            "title": "Open browser to login",
+            "url": "{{browserUrl}}"
+        },
         {
             "type": "Action.Submit",
             "title": "Login",
