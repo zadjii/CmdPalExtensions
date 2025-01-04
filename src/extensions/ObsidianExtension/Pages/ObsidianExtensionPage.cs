@@ -24,11 +24,25 @@ internal sealed partial class ObsidianExtensionPage : ListPage
         PlaceholderText = "Search notes...";
         IsLoading = true;
         ShowDetails = true;
+
+        SettingsManager.Instance.GetSettings().SettingsChanged += (s, e) => RaiseItemsChanged(0);
     }
 
     public override IListItem[] GetItems()
     {
-        var vaultPath = @"C:\Users\zadji\Obsidian\Notes";
+        var vaultPath = SettingsManager.Instance.VaultPath; // @"C:\Users\zadji\Obsidian\Notes";
+        if (string.IsNullOrEmpty(vaultPath)
+            || !Directory.Exists(vaultPath))
+        {
+            var item = new ListItem(new SettingsPage())
+            {
+                Title = "Open settings",
+                Subtitle = "You need to set the path to your vault first",
+            };
+            IsLoading = false;
+            return [item];
+        }
+
         var notes = GetNotes(vaultPath);
         IsLoading = false;
 
@@ -297,6 +311,18 @@ internal sealed partial class OpenDailyNoteCommand : InvokableCommand
         Process.Start(new ProcessStartInfo(uri) { UseShellExecute = true });
         return CommandResult.Dismiss();
     }
+}
+
+[System.Diagnostics.CodeAnalysis.SuppressMessage("StyleCop.CSharp.MaintainabilityRules", "SA1402:File may only contain a single type", Justification = "Sample code")]
+public partial class SettingsPage : FormPage
+{
+    public SettingsPage()
+    {
+        Name = "Settings";
+        Icon = new("\uE713"); // Settings
+    }
+
+    public override IForm[] Forms() => SettingsManager.Instance.GetSettings().ToForms();
 }
 
 [System.Diagnostics.CodeAnalysis.SuppressMessage("StyleCop.CSharp.MaintainabilityRules", "SA1402:File may only contain a single type", Justification = "Sample code")]
