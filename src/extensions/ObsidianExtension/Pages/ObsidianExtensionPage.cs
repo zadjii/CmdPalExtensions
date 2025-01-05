@@ -11,6 +11,7 @@ using System.Text.Json;
 using System.Text.Json.Nodes;
 using Microsoft.CmdPal.Extensions;
 using Microsoft.CmdPal.Extensions.Helpers;
+using Windows.Foundation;
 
 namespace ObsidianExtension;
 
@@ -90,10 +91,12 @@ internal sealed partial class ObsidianExtensionPage : ListPage
             foreach (var noteFile in noteFiles)
             {
                 // Display the note name without the full path or file extension
-                notes.Add(new Note(Path.GetFullPath(noteFile))
+                var n = new Note(Path.GetFullPath(noteFile))
                 {
                     VaultPath = vaultPath,
-                });
+                };
+                n.ContentChanged += (s, e) => this.RaiseItemsChanged(0);
+                notes.Add(n);
             }
         }
 
@@ -192,7 +195,7 @@ public partial class EditNoteForm : Form
         if (fileContent != null)
         {
             var data = fileContent.ToString();
-            File.WriteAllText(_note.AbsolutePath, data);
+            _note.SaveNote(data);
         }
 
         return CommandResult.KeepOpen();
@@ -261,17 +264,17 @@ public partial class AppendToNoteForm : Form
         var formInput = JsonNode.Parse(payload)?.AsObject();
         if (formInput == null)
         {
-            return CommandResult.KeepOpen();
+            return CommandResult.GoBack();
         }
 
         var fileContent = formInput["Content"];
         if (fileContent != null)
         {
             var data = fileContent.ToString();
-            File.AppendAllText(_note.AbsolutePath, $"\n{data}");
+            _note.AppendToNote(data);
         }
 
-        return CommandResult.KeepOpen();
+        return CommandResult.GoBack();
     }
 }
 
@@ -344,6 +347,8 @@ public sealed class Note(string absolutePath)
 
     public string ObsidianProtocolUri => $"obsidian://open?vault={Uri.EscapeDataString(VaultName)}&file={Uri.EscapeDataString(RelativePath)}";
 
+    public event TypedEventHandler<Note, string> ContentChanged;
+
     public string NoteContent()
     {
         try
@@ -356,5 +361,21 @@ public sealed class Note(string absolutePath)
         }
 
         return null;
+    }
+
+    public void SaveNote(string newContent)
+    {
+        File.WriteAllText(AbsolutePath, newContent);
+        ContentChanged?.Invoke(this, null);
+    }
+
+    public void AppendToNote(string newContent)
+    {
+        // The Markdown text block that cmdpal is using has a weirdly hard time
+        // with newlines. like, literally, \n's. If you put one in the file,
+        // then it renders the content from the last \n?
+        // And Obsidian will render a <br> for a single \r, but the preview won't
+        File.AppendAllText(AbsolutePath, $"\r\r{newContent}");
+        ContentChanged?.Invoke(this, null);
     }
 }
