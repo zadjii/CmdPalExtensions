@@ -18,42 +18,65 @@ namespace WinGetExtension;
 
 internal sealed partial class WinGetExtensionPage : DynamicListPage, IDisposable
 {
+    private readonly string _tag = string.Empty;
+
     private readonly Lock _resultsLock = new();
     private readonly Lock _searchLock = new();
     private CancellationTokenSource? _cancellationTokenSource;
 
-    private IEnumerable<CatalogPackage> _results = [];
+    private IEnumerable<CatalogPackage>? _results;
 
-    public WinGetExtensionPage()
+    public WinGetExtensionPage(string tag = "")
     {
         Icon = new("\uE74C");
         Name = "Search Winget";
+        _tag = tag;
     }
 
     public override IListItem[] GetItems()
     {
-        IsLoading = false;
+        IListItem[] items = [];
         lock (_resultsLock)
         {
-            return !_results.Any()
+            var emptySearchForTag = _results == null &&
+                string.IsNullOrEmpty(SearchText) &&
+                !string.IsNullOrEmpty(_tag);
+
+            if (emptySearchForTag)
+            {
+                IsLoading = true;
+                DoSearch(string.Empty);
+                return items;
+            }
+
+            items = (_results == null || !_results.Any())
                 ? [
                     new ListItem(new NoOpCommand())
                     {
-                        Title = string.IsNullOrEmpty(SearchText) ? "Start typing to search for packages" : "No packages found",
+                        Title = (string.IsNullOrEmpty(SearchText) && string.IsNullOrEmpty(_tag)) ?
+                            "Start typing to search for packages" :
+                            "No packages found",
                     }
                 ]
-                : _results.Select(p =>
-                {
-                    var versionText = p.AvailableVersions[0].Version;
-                    var versionTagText = versionText == "Unknown" && p.AvailableVersions[0].PackageCatalogId == "StoreEdgeFD" ? "msstore" : versionText;
-                    return new ListItem(new InstallPackageCommand(p))
-                    {
-                        Title = p.Name,
-                        Subtitle = p.Id,
-                        Tags = [new Tag() { Text = versionTagText }],
-                    };
-                }).ToArray();
+                : _results.Select(PackageToListItem).ToArray();
         }
+
+        IsLoading = false;
+
+        return items;
+    }
+
+    private static ListItem PackageToListItem(CatalogPackage p)
+    {
+        var versionText = p.AvailableVersions[0].Version;
+        var versionTagText = versionText == "Unknown" && p.AvailableVersions[0].PackageCatalogId == "StoreEdgeFD" ? "msstore" : versionText;
+
+        return new ListItem(new InstallPackageCommand(p))
+        {
+            Title = p.Name,
+            Subtitle = p.Id,
+            Tags = [new Tag() { Text = versionTagText }],
+        };
     }
 
     public override void UpdateSearchText(string oldSearch, string newSearch)
@@ -64,7 +87,13 @@ internal sealed partial class WinGetExtensionPage : DynamicListPage, IDisposable
             return;
         }
 
-        if (string.IsNullOrEmpty(newSearch))
+        DoSearch(newSearch);
+    }
+
+    private void DoSearch(string newSearch)
+    {
+        if (string.IsNullOrEmpty(newSearch)
+            && string.IsNullOrEmpty(_tag))
         {
             lock (_resultsLock)
             {
@@ -123,6 +152,8 @@ internal sealed partial class WinGetExtensionPage : DynamicListPage, IDisposable
 
                 Debug.WriteLine($"Finally for '{currentSearch}'");
             }
+
+            IsLoading = false;
         });
     }
 
@@ -138,13 +169,11 @@ internal sealed partial class WinGetExtensionPage : DynamicListPage, IDisposable
         nameFilter.Field = Microsoft.Management.Deployment.PackageMatchField.Name;
         nameFilter.Value = query;
 
-        // filterList.Filters.Add(nameFilter);
         var idFilter = WinGetStatics.WinGetFactory.CreatePackageMatchFilter();
         idFilter.Field = Microsoft.Management.Deployment.PackageMatchField.Id;
         idFilter.Value = query;
         idFilter.Option = PackageFieldMatchOption.ContainsCaseInsensitive;
 
-        // filterList.Filters.Add(idFilter);
         var monikerFilter = WinGetStatics.WinGetFactory.CreatePackageMatchFilter();
         monikerFilter.Field = Microsoft.Management.Deployment.PackageMatchField.Moniker;
         monikerFilter.Value = query;
@@ -166,16 +195,38 @@ internal sealed partial class WinGetExtensionPage : DynamicListPage, IDisposable
         {
             var opts = WinGetStatics.WinGetFactory.CreateFindPackagesOptions();
             opts.Filters.Add(f);
+
+            // testing
+            opts.ResultLimit = 25;
+
             return opts;
-        });
+        }).ToList();
+
+        if (!string.IsNullOrEmpty(_tag))
+        {
+            var tagFilter = WinGetStatics.WinGetFactory.CreatePackageMatchFilter();
+            tagFilter.Field = Microsoft.Management.Deployment.PackageMatchField.Tag;
+            tagFilter.Value = query;
+            tagFilter.Option = PackageFieldMatchOption.ContainsCaseInsensitive;
+
+            // foreach (var filter in filterList)
+            // {
+            //    filter.Filters.Add(tagFilter);
+            // }
+            var opts = WinGetStatics.WinGetFactory.CreateFindPackagesOptions();
+            opts.Filters.Add(tagFilter);
+            opts.ResultLimit = 25; // test
+            filterList.Add(opts);
+        }
+
         if (ct.IsCancellationRequested)
         {
             // Clean up here, then...
             ct.ThrowIfCancellationRequested();
         }
 
-        var connections = WinGetStatics.AvailableCatalogs.ToArray().Select(reference => reference.Connect().PackageCatalog);
-
+        // var connections = WinGetStatics.AvailableCatalogs.ToArray().Select(reference => reference.Connect().PackageCatalog);
+        var connections = WinGetStatics.Connections;
         foreach (var catalog in connections)
         {
             Debug.WriteLine($"  Searching {catalog.Info.Name} ({query})");

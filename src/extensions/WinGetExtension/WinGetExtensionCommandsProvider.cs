@@ -14,10 +14,15 @@ public partial class WinGetExtensionActionsProvider : CommandProvider
         DisplayName = "WinGet for the Command Palette";
     }
 
-    private readonly IListItem[] _commands = [
+    private readonly ICommandItem[] _commands = [
         new ListItem(new WinGetExtensionPage()),
+        new ListItem(
+            new WinGetExtensionPage("command-line") { Title = "tag:command-line" })
+        {
+            Title = "Search for command-line packages",
+        },
         new ListItem(new InstalledPackagesPage())
     ];
 
-    public override IListItem[] TopLevelCommands() => _commands;
+    public override ICommandItem[] TopLevelCommands() => _commands;
 }
