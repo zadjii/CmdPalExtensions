@@ -114,7 +114,7 @@ internal sealed partial class NflExtensionPage : ListPage, IDisposable
                         .Select(c =>
                             new Tag()
                             {
-                                Icon = new IconDataType(c.Team.Id == game.Situation?.Possession ? "🏈" : string.Empty),
+                                Icon = new(c.Team.Id == game.Situation?.Possession ? "🏈" : string.Empty),
                                 Text = $"{c.Team.Abbreviation} {c.Score}",
                                 Foreground = HexToColor(c.Team.AlternateColor),
                                 Background = HexToColor(c.Team.Color),
@@ -124,7 +124,7 @@ internal sealed partial class NflExtensionPage : ListPage, IDisposable
         var details = BuildDetails(game);
 
         // Icon
-        var icon = new IconDataType(string.Empty);
+        var icon = new IconInfo(string.Empty);
         if (game.Situation != null)
         {
             icon = new(game.Situation.IsRedZone ? "🚨" : "🟢");
