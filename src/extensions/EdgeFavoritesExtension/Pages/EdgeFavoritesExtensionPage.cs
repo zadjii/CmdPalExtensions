@@ -15,7 +15,7 @@ internal sealed partial class EdgeFavoritesExtensionPage : ListPage
 {
     private readonly Branding _branding;
 
-    private IListItem[]? _items;
+    private IListItem[]? _topLevelItems;
 
     public EdgeFavoritesExtensionPage(Branding branding)
     {
@@ -45,14 +45,14 @@ internal sealed partial class EdgeFavoritesExtensionPage : ListPage
 
     public override IListItem[] GetItems()
     {
-        if (_items == null)
+        if (_topLevelItems == null)
         {
             _ = Task.Run(GenerateBookmarkItems);
             return [];
         }
 
         IsLoading = false;
-        return _items;
+        return _topLevelItems;
     }
 
     private void GenerateBookmarkItems()
@@ -60,7 +60,7 @@ internal sealed partial class EdgeFavoritesExtensionPage : ListPage
         var root = EdgeFavoritesApi.FetchAllBookmarks(_branding);
         if (root == null)
         {
-            _items = [];
+            _topLevelItems = [];
             RaiseItemsChanged(0);
             return;
         }
@@ -70,11 +70,11 @@ internal sealed partial class EdgeFavoritesExtensionPage : ListPage
         ProcessBookmarks(bookmarksBar, "Bookmarks bar/", items);
         ProcessBookmarks(root.Roots.Other, string.Empty, items);
 
-        _items = [.. items];
-        RaiseItemsChanged(_items.Length);
+        _topLevelItems = [.. items];
+        RaiseItemsChanged(_topLevelItems.Length);
     }
 
-    private static void ProcessBookmarks(BookmarkNode? node, string path, List<IListItem> items)
+    private void ProcessBookmarks(BookmarkNode? node, string path, List<IListItem> items)
     {
         if (node == null)
         {
@@ -93,13 +93,20 @@ internal sealed partial class EdgeFavoritesExtensionPage : ListPage
                 }
                 else if (child.Type == "folder")
                 {
-                    ProcessBookmarks(child, $"{path}{child.Name}/", items);
+                    if (SettingsManager.Instance.FlatList)
+                    {
+                        ProcessBookmarks(child, $"{path}{child.Name}/", items);
+                    }
+                    else
+                    {
+                        items.Add(CreateBookmarkFolderItem(_branding, child, $"{path}{child.Name}/"));
+                    }
                 }
             }
         }
     }
 
-    private static ListItem CreateBookmarkItem(BookmarkNode node, string path)
+    public static ListItem CreateBookmarkItem(BookmarkNode node, string path)
     {
         return new ListItem(new OpenUrlCommand(node.Url))
         {
@@ -114,5 +121,112 @@ _{path}_
 """,
             },
         };
+    }
+
+    public static ListItem CreateBookmarkFolderItem(Branding branding, BookmarkNode node, string path)
+    {
+        var page = new EdgeFavoritesFolderPage(branding, node, path);
+        var newItem = new ListItem(page)
+        {
+            Icon = new("\uE838"), // FolderOpen
+            Title = page.Title,
+            Subtitle = $"{node.Children?.Count ?? 0} sub-items",
+        };
+        return newItem;
+    }
+}
+
+[System.Diagnostics.CodeAnalysis.SuppressMessage("StyleCop.CSharp.MaintainabilityRules", "SA1402:File may only contain a single type", Justification = "I just like it")]
+internal sealed partial class EdgeFavoritesFolderPage : ListPage
+{
+    private readonly Branding _branding;
+    private readonly BookmarkNode _node;
+    private readonly string _nodePath;
+
+    private IListItem[]? _items;
+
+    public EdgeFavoritesFolderPage(Branding branding, BookmarkNode node, string nodePath)
+    {
+        _branding = branding;
+        _node = node;
+        _nodePath = nodePath;
+
+        Icon =
+            branding switch
+            {
+                Branding.Stable => new("https://upload.wikimedia.org/wikipedia/commons/thumb/9/98/Microsoft_Edge_logo_%282019%29.svg/240px-Microsoft_Edge_logo_%282019%29.svg.png"),
+                Branding.Beta => new("https://upload.wikimedia.org/wikipedia/commons/thumb/a/a0/Microsoft_Edge_Beta_Icon_%282019%29.svg/240px-Microsoft_Edge_Beta_Icon_%282019%29.svg.png"),
+                Branding.Canary => new("https://upload.wikimedia.org/wikipedia/commons/thumb/e/e4/Microsoft_Edge_Canary_Logo_%282019%29.svg/240px-Microsoft_Edge_Canary_Logo_%282019%29.svg.png"),
+                Branding.Dev => new("https://upload.wikimedia.org/wikipedia/commons/thumb/3/32/Microsoft_Edge_Dev_Icon_%282019%29.svg/240px-Microsoft_Edge_Dev_Icon_%282019%29.svg.png"),
+                _ => throw new NotImplementedException(),
+            };
+
+        Name = "View";
+
+        // _ = branding switch
+        // {
+        //    Branding.Stable => "Edge",
+        //    Branding.Beta => "Edge Beta",
+        //    Branding.Canary => "Edge Canary",
+        //    Branding.Dev => "Edge Dev",
+        //    _ => throw new NotImplementedException(),
+        // };
+        Title = node.Name;
+        IsLoading = true;
+    }
+
+    public override IListItem[] GetItems()
+    {
+        if (_items == null)
+        {
+            // Lazy load - only generate the list items when we're first called
+            // We don't need to do anything async, because we already loaded
+            // the file
+            GenerateBookmarkItems();
+        }
+
+        IsLoading = false;
+        return _items ?? [];
+    }
+
+    private void GenerateBookmarkItems()
+    {
+        var root = _node;
+        if (root == null)
+        {
+            _items = [];
+            return;
+        }
+
+        var items = new List<IListItem>();
+        ProcessBookmarks(_node, $"{_nodePath}{_node.Name}/", items);
+
+        _items = [.. items];
+    }
+
+    private void ProcessBookmarks(BookmarkNode? node, string path, List<IListItem> items)
+    {
+        if (node == null)
+        {
+            return;
+        }
+
+        // If the node has children, process them
+        if (node.Children != null)
+        {
+            foreach (var child in node.Children)
+            {
+                if (child.Type == "url")
+                {
+                    var newItem = EdgeFavoritesExtensionPage.CreateBookmarkItem(child, path);
+                    items.Add(newItem);
+                }
+                else if (child.Type == "folder")
+                {
+                    var newItem = EdgeFavoritesExtensionPage.CreateBookmarkFolderItem(_branding, child, path);
+                    items.Add(newItem);
+                }
+            }
+        }
     }
 }
