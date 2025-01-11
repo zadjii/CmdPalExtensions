@@ -2,22 +2,44 @@
 // The Microsoft Corporation licenses this file to you under the MIT license.
 // See the LICENSE file in the project root for more information.
 
+using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
 using Microsoft.CmdPal.Extensions;
 using Microsoft.CmdPal.Extensions.Helpers;
+using static EdgeFavoritesExtension.EdgeFavoritesApi;
 
 namespace EdgeFavoritesExtension;
 
 internal sealed partial class EdgeFavoritesExtensionPage : ListPage
 {
+    private readonly Branding _branding;
+
     private IListItem[]? _items;
 
-    public EdgeFavoritesExtensionPage()
+    public EdgeFavoritesExtensionPage(Branding branding)
     {
-        Icon = new("https://upload.wikimedia.org/wikipedia/commons/thumb/a/a0/Microsoft_Edge_Beta_Icon_%282019%29.svg/240px-Microsoft_Edge_Beta_Icon_%282019%29.svg.png");
+        _branding = branding;
+        Icon = branding switch
+        {
+            Branding.Stable => new("https://upload.wikimedia.org/wikipedia/commons/thumb/9/98/Microsoft_Edge_logo_%282019%29.svg/240px-Microsoft_Edge_logo_%282019%29.svg.png"),
+            Branding.Beta => new("https://upload.wikimedia.org/wikipedia/commons/thumb/a/a0/Microsoft_Edge_Beta_Icon_%282019%29.svg/240px-Microsoft_Edge_Beta_Icon_%282019%29.svg.png"),
+            Branding.Canary => new("https://upload.wikimedia.org/wikipedia/commons/thumb/e/e4/Microsoft_Edge_Canary_Logo_%282019%29.svg/240px-Microsoft_Edge_Canary_Logo_%282019%29.svg.png"),
+            Branding.Dev => new("https://upload.wikimedia.org/wikipedia/commons/thumb/3/32/Microsoft_Edge_Dev_Icon_%282019%29.svg/240px-Microsoft_Edge_Dev_Icon_%282019%29.svg.png"),
+            _ => throw new NotImplementedException(),
+        };
+
         Name = "Open favorites";
-        Title = "Edge Beta favorites";
+
+        var brandingName = branding switch
+        {
+            Branding.Stable => "Edge",
+            Branding.Beta => "Edge Beta",
+            Branding.Canary => "Edge Canary",
+            Branding.Dev => "Edge Dev",
+            _ => throw new NotImplementedException(),
+        };
+        Title = $"{brandingName} favorites";
         IsLoading = true;
     }
 
@@ -35,7 +57,7 @@ internal sealed partial class EdgeFavoritesExtensionPage : ListPage
 
     private void GenerateBookmarkItems()
     {
-        var root = EdgeFavoritesApi.FetchAllBookmarks();
+        var root = EdgeFavoritesApi.FetchAllBookmarks(_branding);
         if (root == null)
         {
             _items = [];
@@ -45,10 +67,10 @@ internal sealed partial class EdgeFavoritesExtensionPage : ListPage
 
         var items = new List<IListItem>();
         var bookmarksBar = root.Roots.BookmarkBar;
-        ProcessBookmarks(bookmarksBar, "Bookmarks bar", items);
+        ProcessBookmarks(bookmarksBar, "Bookmarks bar/", items);
         ProcessBookmarks(root.Roots.Other, string.Empty, items);
 
-        _items = items.ToArray();
+        _items = [.. items];
         RaiseItemsChanged(_items.Length);
     }
 
@@ -71,7 +93,7 @@ internal sealed partial class EdgeFavoritesExtensionPage : ListPage
                 }
                 else if (child.Type == "folder")
                 {
-                    ProcessBookmarks(child, $"{path}/{child.Name}", items);
+                    ProcessBookmarks(child, $"{path}{child.Name}/", items);
                 }
             }
         }
@@ -82,7 +104,15 @@ internal sealed partial class EdgeFavoritesExtensionPage : ListPage
         return new ListItem(new OpenUrlCommand(node.Url))
         {
             Title = node.Name,
-            Subtitle = path,
+            Subtitle = node.Url,
+            Details = new Details()
+            {
+                Body = $"""
+# {node.Name}
+_{path}_
+{node.Url}
+""",
+            },
         };
     }
 }

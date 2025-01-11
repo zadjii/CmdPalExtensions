@@ -13,13 +13,47 @@ namespace EdgeFavoritesExtension;
 
 public class EdgeFavoritesApi
 {
-    public static BookmarksRoot? FetchAllBookmarks()
+    public enum Branding
+    {
+        Stable = 0,
+        Beta = 1,
+        Canary = 2,
+        Dev = 3,
+    }
+
+    public static string BrandingName(Branding branding)
+    {
+        return branding switch
+        {
+            Branding.Stable => "Edge",
+            Branding.Beta => "Edge Beta",
+            Branding.Canary => "Edge Canary",
+            Branding.Dev => "Edge Dev",
+            _ => throw new NotImplementedException(),
+        };
+    }
+
+    public static bool HasBranding(Branding branding) => File.Exists(BookmarksPath(branding));
+
+    public static string BookmarksPath(Branding branding)
     {
         // Path to the Edge bookmarks file
-        var localAppData = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
-        var bookmarksPath = Path.Combine(localAppData, @"Microsoft\Edge Beta\User Data\Default\Bookmarks");
+        var brandingPath = branding switch
+        {
+            Branding.Stable => "Edge",
+            Branding.Beta => "Edge Beta",
+            Branding.Canary => "Edge Canary",
+            Branding.Dev => "Edge Dev",
+            _ => throw new NotImplementedException(),
+        };
 
-        if (!File.Exists(bookmarksPath))
+        var localAppData = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
+        return Path.Combine(localAppData, $@"Microsoft\{brandingPath}\User Data\Default\Bookmarks");
+    }
+
+    public static BookmarksRoot? FetchAllBookmarks(Branding branding)
+    {
+        if (!HasBranding(branding))
         {
             ExtensionHost.LogMessage(new LogMessage() { Message = "Favorites file not found " });
             return null;
@@ -28,7 +62,7 @@ public class EdgeFavoritesApi
         try
         {
             // Read the JSON content
-            var jsonContent = File.ReadAllText(bookmarksPath);
+            var jsonContent = File.ReadAllText(BookmarksPath(branding));
 
             // Deserialize the JSON into the Root object
             var root = JsonSerializer.Deserialize<BookmarksRoot>(jsonContent);
