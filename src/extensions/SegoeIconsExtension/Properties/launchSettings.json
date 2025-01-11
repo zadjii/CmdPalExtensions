@@ -1,0 +1,11 @@
+{
+  "profiles": {
+    "SegoeIconsExtension (Package)": {
+      "commandName": "MsixPackage",
+      "doNotLaunchApp": true
+    },
+    "SegoeIconsExtension (Unpackaged)": {
+      "commandName": "Project"
+    }
+  }
+}
