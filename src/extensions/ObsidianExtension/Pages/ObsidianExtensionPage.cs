@@ -26,7 +26,7 @@ internal sealed partial class ObsidianExtensionPage : ListPage
         IsLoading = true;
         ShowDetails = true;
 
-        SettingsManager.Instance.GetSettings().SettingsChanged += (s, e) => RaiseItemsChanged(0);
+        SettingsManager.Instance.Settings.SettingsChanged += (s, e) => RaiseItemsChanged(0);
     }
 
     public override IListItem[] GetItems()
@@ -212,7 +212,7 @@ public partial class AppendToNotePage : FormPage
         _note = note;
         Name = "Quick add";
         Title = _note.Name;
-        Icon = new("\ued0e"); // SubscrptonAdd
+        Icon = new("\ued0e"); // SubscriptionAdd
     }
 
     public override IForm[] Forms() => [new AppendToNoteForm(_note)];
@@ -289,7 +289,7 @@ internal sealed partial class NewNoteCommand : InvokableCommand
 
     public override ICommandResult Invoke()
     {
-        var vaultPath = @"C:\Users\zadji\Obsidian\Notes";
+        var vaultPath = SettingsManager.Instance.VaultPath;
         var vaultName = Path.GetFileName(vaultPath);
         var uri = $"obsidian://new?vault={Uri.EscapeDataString(vaultName)}";
         Process.Start(new ProcessStartInfo(uri) { UseShellExecute = true });
@@ -308,9 +308,9 @@ internal sealed partial class OpenDailyNoteCommand : InvokableCommand
 
     public override ICommandResult Invoke()
     {
-        var vaultPath = @"C:\Users\zadji\Obsidian\Notes";
+        var vaultPath = SettingsManager.Instance.VaultPath;
         var vaultName = Path.GetFileName(vaultPath);
-        var uri = $"obsidian://daily ?vault={Uri.EscapeDataString(vaultName)}";
+        var uri = $"obsidian://daily?vault={Uri.EscapeDataString(vaultName)}";
         Process.Start(new ProcessStartInfo(uri) { UseShellExecute = true });
         return CommandResult.Dismiss();
     }
@@ -325,7 +325,7 @@ public partial class SettingsPage : FormPage
         Icon = new("\uE713"); // Settings
     }
 
-    public override IForm[] Forms() => SettingsManager.Instance.GetSettings().ToForms();
+    public override IForm[] Forms() => SettingsManager.Instance.Settings.ToForms();
 }
 
 [System.Diagnostics.CodeAnalysis.SuppressMessage("StyleCop.CSharp.MaintainabilityRules", "SA1402:File may only contain a single type", Justification = "Sample code")]
