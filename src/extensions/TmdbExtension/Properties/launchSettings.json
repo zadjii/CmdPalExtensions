@@ -1,0 +1,11 @@
+{
+  "profiles": {
+    "TmdbExtension (Package)": {
+      "commandName": "MsixPackage",
+      "doNotLaunchApp": true
+    },
+    "TmdbExtension (Unpackaged)": {
+      "commandName": "Project"
+    }
+  }
+}

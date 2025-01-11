@@ -1,0 +1,11 @@
+{
+  "profiles": {
+    "NflExtension (Package)": {
+      "commandName": "MsixPackage",
+      "doNotLaunchApp": true
+    },
+    "NflExtension (Unpackaged)": {
+      "commandName": "Project"
+    }
+  }
+}

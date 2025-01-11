@@ -1,0 +1,11 @@
+{
+  "profiles": {
+    "ObsidianExtension (Package)": {
+      "commandName": "MsixPackage",
+      "doNotLaunchApp": true
+    },
+    "ObsidianExtension (Unpackaged)": {
+      "commandName": "Project"
+    }
+  }
+}

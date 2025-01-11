@@ -1,0 +1,11 @@
+{
+  "profiles": {
+    "EdgeFavoritesExtension (Package)": {
+      "commandName": "MsixPackage",
+      "doNotLaunchApp": true
+    },
+    "EdgeFavoritesExtension (Unpackaged)": {
+      "commandName": "Project"
+    }
+  }
+}
