@@ -152,8 +152,6 @@ internal sealed partial class WinGetExtensionPage : DynamicListPage, IDisposable
 
                 Debug.WriteLine($"Finally for '{currentSearch}'");
             }
-
-            IsLoading = false;
         });
     }
 
@@ -165,42 +163,16 @@ internal sealed partial class WinGetExtensionPage : DynamicListPage, IDisposable
         var query = SearchText;
         var results = new HashSet<CatalogPackage>(new PackageIdCompare());
 
-        var nameFilter = WinGetStatics.WinGetFactory.CreatePackageMatchFilter();
-        nameFilter.Field = Microsoft.Management.Deployment.PackageMatchField.Name;
-        nameFilter.Value = query;
+        // Default selector: this is the way to do a `winget search <query>`
+        var selector = WinGetStatics.WinGetFactory.CreatePackageMatchFilter();
+        selector.Field = Microsoft.Management.Deployment.PackageMatchField.CatalogDefault;
+        selector.Value = query;
 
-        var idFilter = WinGetStatics.WinGetFactory.CreatePackageMatchFilter();
-        idFilter.Field = Microsoft.Management.Deployment.PackageMatchField.Id;
-        idFilter.Value = query;
-        idFilter.Option = PackageFieldMatchOption.ContainsCaseInsensitive;
+        var opts = WinGetStatics.WinGetFactory.CreateFindPackagesOptions();
+        opts.Selectors.Add(selector);
 
-        var monikerFilter = WinGetStatics.WinGetFactory.CreatePackageMatchFilter();
-        monikerFilter.Field = Microsoft.Management.Deployment.PackageMatchField.Moniker;
-        monikerFilter.Value = query;
-        monikerFilter.Option = PackageFieldMatchOption.ContainsCaseInsensitive;
-
-        var commandFilter = WinGetStatics.WinGetFactory.CreatePackageMatchFilter();
-        commandFilter.Field = Microsoft.Management.Deployment.PackageMatchField.Command;
-        commandFilter.Value = query;
-        commandFilter.Option = PackageFieldMatchOption.ContainsCaseInsensitive;
-
-        // filterList.Filters.Add(monikerFilter);
-        PackageMatchFilter[] filters = [
-            nameFilter,
-            idFilter,
-            commandFilter,
-            monikerFilter
-          ];
-        var filterList = filters.Select(f =>
-        {
-            var opts = WinGetStatics.WinGetFactory.CreateFindPackagesOptions();
-            opts.Filters.Add(f);
-
-            // testing
-            opts.ResultLimit = 25;
-
-            return opts;
-        }).ToList();
+        // testing
+        opts.ResultLimit = 25;
 
         if (!string.IsNullOrEmpty(_tag))
         {
@@ -209,21 +181,11 @@ internal sealed partial class WinGetExtensionPage : DynamicListPage, IDisposable
             tagFilter.Value = query;
             tagFilter.Option = PackageFieldMatchOption.ContainsCaseInsensitive;
 
-            // foreach (var filter in filterList)
-            // {
-            //    filter.Filters.Add(tagFilter);
-            // }
-            var opts = WinGetStatics.WinGetFactory.CreateFindPackagesOptions();
             opts.Filters.Add(tagFilter);
-            opts.ResultLimit = 25; // test
-            filterList.Add(opts);
         }
 
-        if (ct.IsCancellationRequested)
-        {
-            // Clean up here, then...
-            ct.ThrowIfCancellationRequested();
-        }
+        // Clean up here, then...
+        ct.ThrowIfCancellationRequested();
 
         // var connections = WinGetStatics.AvailableCatalogs.ToArray().Select(reference => reference.Connect().PackageCatalog);
         var connections = WinGetStatics.Connections;
@@ -231,36 +193,28 @@ internal sealed partial class WinGetExtensionPage : DynamicListPage, IDisposable
         {
             Debug.WriteLine($"  Searching {catalog.Info.Name} ({query})");
 
-            foreach (var opts in filterList)
+            ct.ThrowIfCancellationRequested();
+
+            // Find the packages with the filters
+            var request = catalog.FindPackagesAsync(opts);
+            var searchResults = await request;
+            foreach (var match in searchResults.Matches.ToArray())
             {
-                if (ct.IsCancellationRequested)
-                {
-                    ct.ThrowIfCancellationRequested();
-                }
+                ct.ThrowIfCancellationRequested();
 
-                // Find the packages with the filters
-                var searchResults = await catalog.FindPackagesAsync(opts);
-                foreach (var match in searchResults.Matches.ToArray())
-                {
-                    if (ct.IsCancellationRequested)
-                    {
-                        ct.ThrowIfCancellationRequested();
-                    }
+                // Print the packages
+                var package = match.CatalogPackage;
 
-                    // Print the packages
-                    var package = match.CatalogPackage;
-
-                    // Console.WriteLine(Package.Name);
-                    results.Add(package);
-                }
-
-                Debug.WriteLine($"    [{catalog.Info.Name}] ({query}): count: {results.Count}");
+                // Console.WriteLine(Package.Name);
+                results.Add(package);
             }
+
+            Debug.WriteLine($"    [{catalog.Info.Name}] ({query}): count: {results.Count}");
         }
 
         stopwatch.Stop();
 
-        Debug.WriteLine($"Search took {stopwatch.ElapsedMilliseconds}");
+        Debug.WriteLine($"Search took {stopwatch.ElapsedMilliseconds}ms");
 
         return results;
     }

@@ -32,6 +32,11 @@ internal static class WinGetStatics
             Manager.GetPredefinedPackageCatalog(PredefinedPackageCatalog.MicrosoftStore),
         ];
 
+        foreach (var catalogReference in AvailableCatalogs)
+        {
+            catalogReference.PackageCatalogBackgroundUpdateInterval = new(0);
+        }
+
         Connections = AvailableCatalogs
             .ToArray()
             .Select(reference => reference.Connect().PackageCatalog);
