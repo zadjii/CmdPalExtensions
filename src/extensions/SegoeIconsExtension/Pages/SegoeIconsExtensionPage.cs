@@ -2,6 +2,8 @@
 // The Microsoft Corporation licenses this file to you under the MIT license.
 // See the LICENSE file in the project root for more information.
 
+using System;
+using System.IO;
 using System.Linq;
 using System.Threading.Tasks;
 using Microsoft.CmdPal.Extensions;
@@ -15,7 +17,7 @@ internal sealed partial class SegoeIconsExtensionPage : ListPage
 
     public SegoeIconsExtensionPage()
     {
-        Icon = new(string.Empty);
+        Icon = new(Path.Combine(AppDomain.CurrentDomain.BaseDirectory.ToString(), "Assets/WinUI3Gallery.png"));
         Name = "Segoe Icons";
         IsLoading = true;
     }
@@ -24,25 +26,23 @@ internal sealed partial class SegoeIconsExtensionPage : ListPage
     {
         if (_items == null)
         {
-            // Lazy load - only generate the list items when we're first called
-            // We don't need to do anything async, because we already loaded
-            // the file
-            _ = Task.Run(GenerateIconItems);
-            return [];
-
-            // GenerateIconItems().Start();
+            var t = GenerateIconItems();
+            t.ConfigureAwait(false);
+            _items = t.Result;
         }
 
         IsLoading = false;
         return _items ?? [];
     }
 
-    private async Task GenerateIconItems()
+    private async Task<IListItem[]> GenerateIconItems()
     {
         var rawIcons = await IconsDataSource.Instance.LoadIcons()!;
-        _items = rawIcons.Select(ToItem).ToArray();
+        var items = rawIcons.AsParallel().Select(ToItem).ToArray();
         IsLoading = false;
-        RaiseItemsChanged(_items.Length);
+        return items;
+
+        // RaiseItemsChanged(_items.Length);
     }
 
     private IconListItem ToItem(IconData d) => new(d);
@@ -54,7 +54,7 @@ internal sealed partial class IconListItem : ListItem
     private readonly IconData _data;
 
     public IconListItem(IconData data)
-        : base(new CopyTextCommand(data.CodeGlyph))
+        : base(new CopyTextCommand(data.CodeGlyph) { Name = $"Copy {data.CodeGlyph}" })
     {
         _data = data;
         this.Title = _data.Name;
@@ -67,9 +67,9 @@ internal sealed partial class IconListItem : ListItem
 
         this.MoreCommands =
         [
-            new CommandContextItem(new CopyTextCommand(data.Character)),
-            new CommandContextItem(new CopyTextCommand(data.TextGlyph)),
-            new CommandContextItem(new CopyTextCommand(data.Name)),
+            new CommandContextItem(new CopyTextCommand(data.Character)) { Title = $"Copy {data.Character}", Icon = new(data.Character) },
+            new CommandContextItem(new CopyTextCommand(data.TextGlyph)) { Title = $"Copy {data.TextGlyph}" },
+            new CommandContextItem(new CopyTextCommand(data.Name)) { Title = $"Copy {data.Name}" },
         ];
     }
 }
