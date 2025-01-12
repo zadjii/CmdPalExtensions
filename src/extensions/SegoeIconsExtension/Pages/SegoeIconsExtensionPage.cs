@@ -3,8 +3,10 @@
 // See the LICENSE file in the project root for more information.
 
 using System;
+using System.Diagnostics;
 using System.IO;
 using System.Linq;
+using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.CmdPal.Extensions;
 using Microsoft.CmdPal.Extensions.Helpers;
@@ -13,6 +15,8 @@ namespace SegoeIconsExtension;
 
 internal sealed partial class SegoeIconsExtensionPage : ListPage
 {
+    private readonly Lock _lock = new();
+
     private IListItem[]? _items;
 
     public SegoeIconsExtensionPage()
@@ -20,29 +24,41 @@ internal sealed partial class SegoeIconsExtensionPage : ListPage
         Icon = new(Path.Combine(AppDomain.CurrentDomain.BaseDirectory.ToString(), "Assets/WinUI3Gallery.png"));
         Name = "Segoe Icons";
         IsLoading = true;
+        PreloadIcons();
+    }
+
+    public void PreloadIcons()
+    {
+        _ = Task.Run(() =>
+        {
+            lock (_lock)
+            {
+                var t = GenerateIconItems();
+                t.ConfigureAwait(false);
+                _items = t.Result;
+            }
+        });
     }
 
     public override IListItem[] GetItems()
     {
-        if (_items == null)
+        lock (_lock)
         {
-            var t = GenerateIconItems();
-            t.ConfigureAwait(false);
-            _items = t.Result;
+            IsLoading = false;
+            return _items ?? [];
         }
-
-        IsLoading = false;
-        return _items ?? [];
     }
 
     private async Task<IListItem[]> GenerateIconItems()
     {
+        var timer = new Stopwatch();
+        timer.Start();
         var rawIcons = await IconsDataSource.Instance.LoadIcons()!;
-        var items = rawIcons.AsParallel().Select(ToItem).ToArray();
+        var items = rawIcons.Select(ToItem).ToArray();
         IsLoading = false;
+        timer.Stop();
+        Debug.WriteLine($"Generating icons took {timer.ElapsedMilliseconds}ms");
         return items;
-
-        // RaiseItemsChanged(_items.Length);
     }
 
     private IconListItem ToItem(IconData d) => new(d);
