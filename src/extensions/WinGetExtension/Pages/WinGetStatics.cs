@@ -2,8 +2,11 @@
 // The Microsoft Corporation licenses this file to you under the MIT license.
 // See the LICENSE file in the project root for more information.
 
+using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Linq;
+using System.Threading.Tasks;
 using Microsoft.Management.Deployment;
 using WindowsPackageManager.Interop;
 
@@ -18,6 +21,8 @@ internal static class WinGetStatics
     public static IReadOnlyList<PackageCatalogReference> AvailableCatalogs { get; private set; }
 
     public static IEnumerable<PackageCatalog> Connections { get; private set; }
+
+    private static PackageCatalog? _compositeCatalog;
 
     static WinGetStatics()
     {
@@ -40,5 +45,40 @@ internal static class WinGetStatics
         Connections = AvailableCatalogs
             .ToArray()
             .Select(reference => reference.Connect().PackageCatalog);
+    }
+
+    internal static async Task<PackageCatalog> GetCompositeCatalog()
+    {
+        if (_compositeCatalog != null)
+        {
+            return _compositeCatalog;
+        }
+
+        Stopwatch stopwatch = new();
+        Debug.WriteLine("Starting GetCompositeCatalog fetch");
+        stopwatch.Start();
+
+        // Create the composite catalog
+        var createCompositePackageCatalogOptions = WinGetFactory.CreateCreateCompositePackageCatalogOptions();
+
+        // createCompositePackageCatalogOptions.Catalogs.Add(selectedRemoteCatalogRef);
+        foreach (var catalogReference in WinGetStatics.AvailableCatalogs.ToArray())
+        {
+            createCompositePackageCatalogOptions.Catalogs.Add(catalogReference);
+        }
+
+        createCompositePackageCatalogOptions.CompositeSearchBehavior = CompositeSearchBehavior.RemotePackagesFromAllCatalogs;
+
+        var catalogRef = WinGetStatics.Manager.CreateCompositePackageCatalog(createCompositePackageCatalogOptions);
+
+        // catalogRef.PackageCatalogBackgroundUpdateInterval = new(0);
+        var connectResult = await catalogRef.ConnectAsync();
+        var compositeCatalog = connectResult.PackageCatalog;
+        _compositeCatalog = compositeCatalog;
+
+        stopwatch.Stop();
+        Debug.WriteLine($"GetCompositeCatalog fetch took {stopwatch.ElapsedMilliseconds}ms");
+
+        return compositeCatalog;
     }
 }

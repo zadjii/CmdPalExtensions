@@ -103,60 +103,63 @@ internal sealed partial class WinGetExtensionPage : DynamicListPage, IDisposable
             return;
         }
 
-        _ = Task.Run(async () =>
+        _ = Task.Run(CancellableSearchAsync);
+    }
+
+    private async Task CancellableSearchAsync()
+    {
+        CancellationTokenSource? oldCts, currentCts;
+        lock (_searchLock)
         {
-            CancellationTokenSource? oldCts, currentCts;
+            oldCts = _cancellationTokenSource;
+            currentCts = _cancellationTokenSource = new CancellationTokenSource();
+        }
+
+        oldCts?.Cancel();
+
+        var currentSearch = SearchText;
+        Debug.WriteLine($"Starting search for '{currentSearch}'");
+
+        var task = Task.Run(
+             () => DoSearchAsync(currentCts.Token),
+             currentCts.Token);
+
+        try
+        {
+            var results = await task;
+            Debug.WriteLine($"Completed search for '{currentSearch}'");
+            lock (_resultsLock)
+            {
+                this._results = results;
+            }
+
+            RaiseItemsChanged(this._results.Count());
+        }
+        catch (OperationCanceledException)
+        {
+            // We were cancelled? oh no. Anyways.
+            Debug.WriteLine($"Cancelled search for {currentSearch}");
+        }
+        catch (Exception)
+        {
+            Debug.WriteLine($"Something else weird happened in {currentSearch}");
+        }
+        finally
+        {
             lock (_searchLock)
             {
-                oldCts = _cancellationTokenSource;
-                currentCts = _cancellationTokenSource = new CancellationTokenSource();
+                currentCts?.Dispose();
             }
 
-            oldCts?.Cancel();
-            var currentSearch = SearchText;
-            Debug.WriteLine($"Starting search for '{currentSearch}'");
-            var task = Task.Run(
-                () =>
-            {
-                // Were we already canceled?
-                currentCts.Token.ThrowIfCancellationRequested();
-                return DoSearchAsync(currentCts.Token);
-            },
-                currentCts.Token);
-            try
-            {
-                var results = await task;
-                Debug.WriteLine($"Completed search for '{currentSearch}'");
-                lock (_resultsLock)
-                {
-                    this._results = results;
-                }
-
-                RaiseItemsChanged(this._results.Count());
-            }
-            catch (OperationCanceledException)
-            {
-                // We were cancelled? oh no. Anyways.
-                Debug.WriteLine($"Cancelled search for {currentSearch}");
-            }
-            catch (Exception)
-            {
-                Debug.WriteLine($"Something else weird happened in {currentSearch}");
-            }
-            finally
-            {
-                lock (_searchLock)
-                {
-                    currentCts?.Dispose();
-                }
-
-                Debug.WriteLine($"Finally for '{currentSearch}'");
-            }
-        });
+            Debug.WriteLine($"Finally for '{currentSearch}'");
+        }
     }
 
     private async Task<IEnumerable<CatalogPackage>> DoSearchAsync(CancellationToken ct)
     {
+        // Were we already canceled?
+        ct.ThrowIfCancellationRequested();
+
         Stopwatch stopwatch = new();
         stopwatch.Start();
 
@@ -188,8 +191,10 @@ internal sealed partial class WinGetExtensionPage : DynamicListPage, IDisposable
         ct.ThrowIfCancellationRequested();
 
         // var connections = WinGetStatics.AvailableCatalogs.ToArray().Select(reference => reference.Connect().PackageCatalog);
-        var connections = WinGetStatics.Connections;
-        foreach (var catalog in connections)
+        // var connections = WinGetStatics.Connections;
+        var catalog = await WinGetStatics.GetCompositeCatalog();
+
+        // foreach (var catalog in connections)
         {
             Debug.WriteLine($"  Searching {catalog.Info.Name} ({query})");
 
@@ -197,7 +202,8 @@ internal sealed partial class WinGetExtensionPage : DynamicListPage, IDisposable
 
             // Find the packages with the filters
             var request = catalog.FindPackagesAsync(opts);
-            var searchResults = await request;
+            var cancellable = AsTaskWithCancellation(request, ct);
+            var searchResults = await cancellable;
             foreach (var match in searchResults.Matches.ToArray())
             {
                 ct.ThrowIfCancellationRequested();
@@ -214,7 +220,7 @@ internal sealed partial class WinGetExtensionPage : DynamicListPage, IDisposable
 
         stopwatch.Stop();
 
-        Debug.WriteLine($"Search took {stopwatch.ElapsedMilliseconds}ms");
+        Debug.WriteLine($"Search \"{query}\" took {stopwatch.ElapsedMilliseconds}ms");
 
         return results;
     }
@@ -232,7 +238,7 @@ internal sealed partial class WinGetExtensionPage : DynamicListPage, IDisposable
             createCompositePackageCatalogOptions.Catalogs.Add(catalogReference);
         }
 
-        createCompositePackageCatalogOptions.CompositeSearchBehavior = CompositeSearchBehavior.RemotePackagesFromRemoteCatalogs;
+        createCompositePackageCatalogOptions.CompositeSearchBehavior = CompositeSearchBehavior.RemotePackagesFromAllCatalogs;
 
         var catalogRef = WinGetStatics.Manager.CreateCompositePackageCatalog(createCompositePackageCatalogOptions);
         var connectResult = await catalogRef.ConnectAsync();
@@ -241,6 +247,46 @@ internal sealed partial class WinGetExtensionPage : DynamicListPage, IDisposable
     }
 
     public void Dispose() => throw new NotImplementedException();
+
+    private static async Task<T> AsTaskWithCancellation<T>(Windows.Foundation.IAsyncOperation<T> operation, CancellationToken cancellationToken)
+    {
+        // Create a TaskCompletionSource to wrap the IAsyncOperation
+        var tcs = new TaskCompletionSource<T>();
+
+        // Attach completion and error handlers
+        operation.Completed = (op, status) =>
+        {
+            switch (status)
+            {
+                case Windows.Foundation.AsyncStatus.Completed:
+                    tcs.TrySetResult(op.GetResults());
+                    break;
+                case Windows.Foundation.AsyncStatus.Error:
+                    tcs.TrySetException(op.ErrorCode);
+                    break;
+                case Windows.Foundation.AsyncStatus.Canceled:
+                    tcs.TrySetCanceled();
+                    break;
+            }
+        };
+
+        // Handle cancellation from the CancellationToken
+        using (cancellationToken.Register(() =>
+        {
+            try
+            {
+                operation.Cancel();
+            }
+            catch
+            {
+                // Ignore if cancel fails
+            }
+        }))
+        {
+            // Await the TaskCompletionSource's task
+            return await tcs.Task;
+        }
+    }
 }
 
 [System.Diagnostics.CodeAnalysis.SuppressMessage("StyleCop.CSharp.MaintainabilityRules", "SA1402:File may only contain a single type", Justification = "I just like it")]
