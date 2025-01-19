@@ -31,6 +31,7 @@ internal sealed partial class WinGetExtensionPage : DynamicListPage, IDisposable
         Icon = new("\uE74C");
         Name = "Search Winget";
         _tag = tag;
+        ShowDetails = true;
     }
 
     public override IListItem[] GetItems()
@@ -66,18 +67,7 @@ internal sealed partial class WinGetExtensionPage : DynamicListPage, IDisposable
         return items;
     }
 
-    private static ListItem PackageToListItem(CatalogPackage p)
-    {
-        var versionText = p.AvailableVersions[0].Version;
-        var versionTagText = versionText == "Unknown" && p.AvailableVersions[0].PackageCatalogId == "StoreEdgeFD" ? "msstore" : versionText;
-
-        return new ListItem(new InstallPackageCommand(p))
-        {
-            Title = p.Name,
-            Subtitle = p.Id,
-            Tags = [new Tag() { Text = versionTagText }],
-        };
-    }
+    private static ListItem PackageToListItem(CatalogPackage p) => new InstallPackageListItem(p);
 
     public override void UpdateSearchText(string oldSearch, string newSearch)
     {
@@ -211,7 +201,6 @@ internal sealed partial class WinGetExtensionPage : DynamicListPage, IDisposable
                 // Print the packages
                 var package = match.CatalogPackage;
 
-                // Console.WriteLine(Package.Name);
                 results.Add(package);
             }
 
@@ -223,27 +212,6 @@ internal sealed partial class WinGetExtensionPage : DynamicListPage, IDisposable
         Debug.WriteLine($"Search \"{query}\" took {stopwatch.ElapsedMilliseconds}ms");
 
         return results;
-    }
-
-    internal async Task<PackageCatalog> GetCompositeCatalog()
-    {
-        // Get the remote catalog
-        // PackageCatalogReference selectedRemoteCatalogRef = _availableCatalogs[0]; // loop?
-        // Create the composite catalog
-        var createCompositePackageCatalogOptions = WinGetStatics.WinGetFactory.CreateCreateCompositePackageCatalogOptions();
-
-        // createCompositePackageCatalogOptions.Catalogs.Add(selectedRemoteCatalogRef);
-        foreach (var catalogReference in WinGetStatics.AvailableCatalogs.ToArray())
-        {
-            createCompositePackageCatalogOptions.Catalogs.Add(catalogReference);
-        }
-
-        createCompositePackageCatalogOptions.CompositeSearchBehavior = CompositeSearchBehavior.RemotePackagesFromAllCatalogs;
-
-        var catalogRef = WinGetStatics.Manager.CreateCompositePackageCatalog(createCompositePackageCatalogOptions);
-        var connectResult = await catalogRef.ConnectAsync();
-        var compositeCatalog = connectResult.PackageCatalog;
-        return compositeCatalog;
     }
 
     public void Dispose() => throw new NotImplementedException();
@@ -298,6 +266,57 @@ public sealed class PackageIdCompare : IEqualityComparer<CatalogPackage>
 }
 
 [System.Diagnostics.CodeAnalysis.SuppressMessage("StyleCop.CSharp.MaintainabilityRules", "SA1402:File may only contain a single type", Justification = "I just like it")]
+public partial class InstallPackageListItem : ListItem
+{
+    private readonly CatalogPackage _package;
+    private readonly InstallPackageCommand _installCommand;
+
+    public InstallPackageListItem(CatalogPackage package)
+        : base(new InstallPackageCommand(package))
+    {
+        _package = package;
+        _installCommand = (InstallPackageCommand)Command!;
+
+        var version = _package.DefaultInstallVersion;
+        var versionText = version.Version;
+        var versionTagText = versionText == "Unknown" && version.PackageCatalog.Info.Id == "StoreEdgeFD" ? "msstore" : versionText;
+
+        Title = _package.Name;
+        Subtitle = _package.Id;
+        Tags = [new Tag() { Text = versionTagText }];
+
+        var metadata = version.GetCatalogPackageMetadata();
+        if (metadata != null)
+        {
+            var detailsBody = $"""
+# {metadata.PackageName}
+## {metadata.Publisher}
+
+{metadata.Description}
+""";
+            Details = new Details() { Body = detailsBody };
+        }
+
+        _ = Task.Run(UpdatedInstalledStatus);
+    }
+
+    private async void UpdatedInstalledStatus()
+    {
+        var status = await _package.CheckInstalledStatusAsync();
+        var isInstalled = _package.InstalledVersion != null;
+        Icon = new(isInstalled ? "\uE930" : "\uE896"); // Completed : Download
+        _installCommand.Icon = Icon;
+        _installCommand.Name = isInstalled ? "Installed" : "Install";
+
+        if (status.Status == CheckInstalledStatusResultStatus.Ok)
+        {
+            var l = status.PackageInstalledStatus;
+            _ = l;
+        }
+    }
+}
+
+[System.Diagnostics.CodeAnalysis.SuppressMessage("StyleCop.CSharp.MaintainabilityRules", "SA1402:File may only contain a single type", Justification = "I just like it")]
 public partial class InstallPackageCommand : InvokableCommand
 {
     private readonly CatalogPackage _package;
@@ -306,18 +325,6 @@ public partial class InstallPackageCommand : InvokableCommand
     {
         _package = package;
         Name = "Install";
-        _ = Task.Run(async () =>
-        {
-            var status = await _package.CheckInstalledStatusAsync();
-            var isInstalled = _package.InstalledVersion != null;
-            Icon = new(isInstalled ? "\uE930" : "\uE896"); // Completed : Download
-
-            if (status.Status == CheckInstalledStatusResultStatus.Ok)
-            {
-                var l = status.PackageInstalledStatus;
-                _ = l;
-            }
-        });
     }
 
     public override ICommandResult Invoke()
@@ -367,7 +374,6 @@ public partial class InstalledPackagesPage : ListPage
             {
                 var versionText = p.InstalledVersion?.Version ?? string.Empty;
 
-                // var versionTagText = versionText == "Unknown" && p.AvailableVersions[0].PackageCatalogId == "StoreEdgeFD" ? "msstore" : versionText;
                 Tag[] tags = string.IsNullOrEmpty(versionText) ? [] : [new Tag() { Text = versionText }];
                 return new ListItem(new InstallPackageCommand(p))
                 {

@@ -31,7 +31,6 @@ internal static class WinGetStatics
         // Create Package Manager and get available catalogs
         Manager = WinGetFactory.CreatePackageManager();
 
-        // AvailableCatalogs = Manager.GetPackageCatalogs();
         AvailableCatalogs = [
             Manager.GetPredefinedPackageCatalog(PredefinedPackageCatalog.OpenWindowsCatalog),
             Manager.GetPredefinedPackageCatalog(PredefinedPackageCatalog.MicrosoftStore),
@@ -61,17 +60,17 @@ internal static class WinGetStatics
         // Create the composite catalog
         var createCompositePackageCatalogOptions = WinGetFactory.CreateCreateCompositePackageCatalogOptions();
 
-        // createCompositePackageCatalogOptions.Catalogs.Add(selectedRemoteCatalogRef);
+        // Add winget and the store to this catalog
         foreach (var catalogReference in WinGetStatics.AvailableCatalogs.ToArray())
         {
             createCompositePackageCatalogOptions.Catalogs.Add(catalogReference);
         }
 
+        // Searches only the catalogs provided, but will correlated with installed items
         createCompositePackageCatalogOptions.CompositeSearchBehavior = CompositeSearchBehavior.RemotePackagesFromAllCatalogs;
 
         var catalogRef = WinGetStatics.Manager.CreateCompositePackageCatalog(createCompositePackageCatalogOptions);
 
-        // catalogRef.PackageCatalogBackgroundUpdateInterval = new(0);
         var connectResult = await catalogRef.ConnectAsync();
         var compositeCatalog = connectResult.PackageCatalog;
         _compositeCatalog = compositeCatalog;
