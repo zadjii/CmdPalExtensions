@@ -22,7 +22,9 @@ internal sealed partial class WinGetExtensionPage : DynamicListPage, IDisposable
 
     private readonly Lock _resultsLock = new();
     private readonly Lock _searchLock = new();
+
     private CancellationTokenSource? _cancellationTokenSource;
+    private Task<IEnumerable<CatalogPackage>>? _currentSearchTask;
 
     private IEnumerable<CatalogPackage>? _results;
 
@@ -46,7 +48,7 @@ internal sealed partial class WinGetExtensionPage : DynamicListPage, IDisposable
             if (emptySearchForTag)
             {
                 IsLoading = true;
-                DoSearch(string.Empty);
+                DoUpdateSearchText(string.Empty);
                 return items;
             }
 
@@ -71,81 +73,70 @@ internal sealed partial class WinGetExtensionPage : DynamicListPage, IDisposable
 
     public override void UpdateSearchText(string oldSearch, string newSearch)
     {
-        IsLoading = true;
         if (newSearch == oldSearch)
         {
             return;
         }
 
-        DoSearch(newSearch);
+        DoUpdateSearchText(newSearch);
     }
 
-    private void DoSearch(string newSearch)
+    private void DoUpdateSearchText(string newSearch)
     {
-        if (string.IsNullOrEmpty(newSearch)
-            && string.IsNullOrEmpty(_tag))
-        {
-            lock (_resultsLock)
-            {
-                this._results = [];
-            }
+        // Cancel any ongoing search
+        _cancellationTokenSource?.Cancel();
+        _cancellationTokenSource = new CancellationTokenSource();
 
-            return;
-        }
+        var cancellationToken = _cancellationTokenSource.Token;
 
-        _ = Task.Run(CancellableSearchAsync);
+        IsLoading = true;
+
+        // Save the latest search task
+        _currentSearchTask = DoSearchAsync(newSearch, cancellationToken);
+
+        // Await the task to ensure only the latest one gets processed
+        _ = ProcessSearchResultsAsync(_currentSearchTask, newSearch);
     }
 
-    private async Task CancellableSearchAsync()
+    private async Task ProcessSearchResultsAsync(
+        Task<IEnumerable<CatalogPackage>> searchTask,
+        string newSearch)
     {
-        CancellationTokenSource? oldCts, currentCts;
-        lock (_searchLock)
-        {
-            oldCts = _cancellationTokenSource;
-            currentCts = _cancellationTokenSource = new CancellationTokenSource();
-        }
-
-        oldCts?.Cancel();
-
-        var currentSearch = SearchText;
-        Debug.WriteLine($"Starting search for '{currentSearch}'");
-
-        var task = Task.Run(
-             () => DoSearchAsync(currentCts.Token),
-             currentCts.Token);
-
         try
         {
-            var results = await task;
-            Debug.WriteLine($"Completed search for '{currentSearch}'");
-            lock (_resultsLock)
-            {
-                this._results = results;
-            }
+            var results = await searchTask;
 
-            RaiseItemsChanged(this._results.Count());
+            // Ensure this is still the latest task
+            if (_currentSearchTask == searchTask)
+            {
+                // Process the results (e.g., update UI)
+                UpdateWithResults(results, newSearch);
+            }
         }
         catch (OperationCanceledException)
         {
-            // We were cancelled? oh no. Anyways.
-            Debug.WriteLine($"Cancelled search for {currentSearch}");
+            // Handle cancellation gracefully (e.g., log or ignore)
+            Debug.WriteLine($"  Cancelled search for '{newSearch}'");
         }
-        catch (Exception)
+        catch (Exception ex)
         {
-            Debug.WriteLine($"Something else weird happened in {currentSearch}");
-        }
-        finally
-        {
-            lock (_searchLock)
-            {
-                currentCts?.Dispose();
-            }
-
-            Debug.WriteLine($"Finally for '{currentSearch}'");
+            // Handle other exceptions
+            Console.WriteLine(ex.Message);
         }
     }
 
-    private async Task<IEnumerable<CatalogPackage>> DoSearchAsync(CancellationToken ct)
+    private void UpdateWithResults(IEnumerable<CatalogPackage> results, string query)
+    {
+        Debug.WriteLine($"Completed search for '{query}'");
+        lock (_resultsLock)
+        {
+            this._results = results;
+        }
+
+        RaiseItemsChanged(this._results.Count());
+    }
+
+    private async Task<IEnumerable<CatalogPackage>> DoSearchAsync(string query, CancellationToken ct)
     {
         // Were we already canceled?
         ct.ThrowIfCancellationRequested();
@@ -153,13 +144,21 @@ internal sealed partial class WinGetExtensionPage : DynamicListPage, IDisposable
         Stopwatch stopwatch = new();
         stopwatch.Start();
 
-        var query = SearchText;
+        if (string.IsNullOrEmpty(query)
+            && string.IsNullOrEmpty(_tag))
+        {
+            return [];
+        }
+
+        var searchDebugText = $"{query}{(!string.IsNullOrEmpty(_tag) ? "+" : string.Empty)}{_tag}";
+        Debug.WriteLine($"Starting search for '{searchDebugText}'");
         var results = new HashSet<CatalogPackage>(new PackageIdCompare());
 
         // Default selector: this is the way to do a `winget search <query>`
         var selector = WinGetStatics.WinGetFactory.CreatePackageMatchFilter();
         selector.Field = Microsoft.Management.Deployment.PackageMatchField.CatalogDefault;
         selector.Value = query;
+        selector.Option = PackageFieldMatchOption.ContainsCaseInsensitive;
 
         var opts = WinGetStatics.WinGetFactory.CreateFindPackagesOptions();
         opts.Selectors.Add(selector);
@@ -204,12 +203,12 @@ internal sealed partial class WinGetExtensionPage : DynamicListPage, IDisposable
                 results.Add(package);
             }
 
-            Debug.WriteLine($"    [{catalog.Info.Name}] ({query}): count: {results.Count}");
+            Debug.WriteLine($"    ({searchDebugText}): count: {results.Count}");
         }
 
         stopwatch.Stop();
 
-        Debug.WriteLine($"Search \"{query}\" took {stopwatch.ElapsedMilliseconds}ms");
+        Debug.WriteLine($"Search \"{searchDebugText}\" took {stopwatch.ElapsedMilliseconds}ms");
 
         return results;
     }
