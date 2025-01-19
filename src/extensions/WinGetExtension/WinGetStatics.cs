@@ -10,7 +10,7 @@ using System.Threading.Tasks;
 using Microsoft.Management.Deployment;
 using WindowsPackageManager.Interop;
 
-namespace WinGetExtension.Pages;
+namespace WinGetExtension;
 
 internal static class WinGetStatics
 {
