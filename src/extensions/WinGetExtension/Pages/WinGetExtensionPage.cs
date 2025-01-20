@@ -20,8 +20,9 @@ internal sealed partial class WinGetExtensionPage : DynamicListPage, IDisposable
 {
     private readonly string _tag = string.Empty;
 
+    public bool HasTag => !string.IsNullOrEmpty(_tag);
+
     private readonly Lock _resultsLock = new();
-    private readonly Lock _searchLock = new();
 
     private CancellationTokenSource? _cancellationTokenSource;
     private Task<IEnumerable<CatalogPackage>>? _currentSearchTask;
@@ -43,7 +44,7 @@ internal sealed partial class WinGetExtensionPage : DynamicListPage, IDisposable
         {
             var emptySearchForTag = _results == null &&
                 string.IsNullOrEmpty(SearchText) &&
-                !string.IsNullOrEmpty(_tag);
+                HasTag;
 
             if (emptySearchForTag)
             {
@@ -56,7 +57,7 @@ internal sealed partial class WinGetExtensionPage : DynamicListPage, IDisposable
                 ? [
                     new ListItem(new NoOpCommand())
                     {
-                        Title = (string.IsNullOrEmpty(SearchText) && string.IsNullOrEmpty(_tag)) ?
+                        Title = (string.IsNullOrEmpty(SearchText) && !HasTag) ?
                             "Start typing to search for packages" :
                             "No packages found",
                     }
@@ -150,7 +151,7 @@ internal sealed partial class WinGetExtensionPage : DynamicListPage, IDisposable
             return [];
         }
 
-        var searchDebugText = $"{query}{(!string.IsNullOrEmpty(_tag) ? "+" : string.Empty)}{_tag}";
+        var searchDebugText = $"{query}{(HasTag ? "+" : string.Empty)}{_tag}";
         Debug.WriteLine($"Starting search for '{searchDebugText}'");
         var results = new HashSet<CatalogPackage>(new PackageIdCompare());
 
@@ -166,7 +167,8 @@ internal sealed partial class WinGetExtensionPage : DynamicListPage, IDisposable
         // testing
         opts.ResultLimit = 25;
 
-        if (!string.IsNullOrEmpty(_tag))
+        // Selectors is "OR", Filters is "AND"
+        if (HasTag)
         {
             var tagFilter = WinGetStatics.WinGetFactory.CreatePackageMatchFilter();
             tagFilter.Field = Microsoft.Management.Deployment.PackageMatchField.Tag;
@@ -179,9 +181,11 @@ internal sealed partial class WinGetExtensionPage : DynamicListPage, IDisposable
         // Clean up here, then...
         ct.ThrowIfCancellationRequested();
 
-        // var connections = WinGetStatics.AvailableCatalogs.ToArray().Select(reference => reference.Connect().PackageCatalog);
-        // var connections = WinGetStatics.Connections;
-        var catalog = await WinGetStatics.GetCompositeCatalog();
+        var catalogTask = HasTag ? WinGetStatics.CompositeWingetCatalog : WinGetStatics.CompositeAllCatalog;
+
+        // Both these catalogs should have been instantiated by the
+        // WinGetStatics static ctor when we were created.
+        var catalog = await catalogTask.Value;
 
         // foreach (var catalog in connections)
         {

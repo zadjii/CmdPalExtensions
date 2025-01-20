@@ -2,7 +2,6 @@
 // The Microsoft Corporation licenses this file to you under the MIT license.
 // See the LICENSE file in the project root for more information.
 
-using System.Threading.Tasks;
 using Microsoft.CmdPal.Extensions;
 using Microsoft.CmdPal.Extensions.Helpers;
 using WinGetExtension.Pages;
@@ -14,8 +13,10 @@ public partial class WinGetExtensionActionsProvider : CommandProvider
     public WinGetExtensionActionsProvider()
     {
         DisplayName = "WinGet for the Command Palette";
+        _ = WinGetStatics.Manager;
 
-        _ = Task.Run(WinGetStatics.GetCompositeCatalog);
+        // _ = Task.Run(async () => await WinGetStatics.CompositeAllCatalog);
+        // _ = Task.Run(async () => await WinGetStatics.CompositeWingetCatalog);
     }
 
     private readonly ICommandItem[] _commands = [

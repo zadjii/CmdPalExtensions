@@ -20,9 +20,12 @@ internal static class WinGetStatics
 
     public static IReadOnlyList<PackageCatalogReference> AvailableCatalogs { get; private set; }
 
-    public static IEnumerable<PackageCatalog> Connections { get; private set; }
+    private static readonly PackageCatalogReference _wingetCatalog;
+    private static readonly PackageCatalogReference _storeCatalog;
 
-    private static PackageCatalog? _compositeCatalog;
+    public static Lazy<Task<PackageCatalog>> CompositeAllCatalog { get; } = new(() => GetCompositeCatalog(true));
+
+    public static Lazy<Task<PackageCatalog>> CompositeWingetCatalog { get; } = new(() => GetCompositeCatalog(false));
 
     static WinGetStatics()
     {
@@ -31,9 +34,11 @@ internal static class WinGetStatics
         // Create Package Manager and get available catalogs
         Manager = WinGetFactory.CreatePackageManager();
 
+        _wingetCatalog = Manager.GetPredefinedPackageCatalog(PredefinedPackageCatalog.OpenWindowsCatalog);
+        _storeCatalog = Manager.GetPredefinedPackageCatalog(PredefinedPackageCatalog.MicrosoftStore);
         AvailableCatalogs = [
-            Manager.GetPredefinedPackageCatalog(PredefinedPackageCatalog.OpenWindowsCatalog),
-            Manager.GetPredefinedPackageCatalog(PredefinedPackageCatalog.MicrosoftStore),
+            _wingetCatalog,
+            _storeCatalog,
         ];
 
         foreach (var catalogReference in AvailableCatalogs)
@@ -41,29 +46,35 @@ internal static class WinGetStatics
             catalogReference.PackageCatalogBackgroundUpdateInterval = new(0);
         }
 
-        Connections = AvailableCatalogs
-            .ToArray()
-            .Select(reference => reference.Connect().PackageCatalog);
+        // Immediately start the lazy-init of the all packages catalog, but
+        // leave the winget one to be initialized as needed
+        _ = Task.Run(() =>
+        {
+            _ = CompositeAllCatalog.Value;
+            _ = CompositeWingetCatalog.Value;
+        });
     }
 
-    internal static async Task<PackageCatalog> GetCompositeCatalog()
+    internal static async Task<PackageCatalog> GetCompositeCatalog(bool all)
     {
-        if (_compositeCatalog != null)
-        {
-            return _compositeCatalog;
-        }
-
         Stopwatch stopwatch = new();
-        Debug.WriteLine("Starting GetCompositeCatalog fetch");
+        Debug.WriteLine($"Starting GetCompositeCatalog({all}) fetch");
         stopwatch.Start();
 
         // Create the composite catalog
         var createCompositePackageCatalogOptions = WinGetFactory.CreateCreateCompositePackageCatalogOptions();
 
-        // Add winget and the store to this catalog
-        foreach (var catalogReference in WinGetStatics.AvailableCatalogs.ToArray())
+        if (all)
         {
-            createCompositePackageCatalogOptions.Catalogs.Add(catalogReference);
+            // Add winget and the store to this catalog
+            foreach (var catalogReference in AvailableCatalogs.ToArray())
+            {
+                createCompositePackageCatalogOptions.Catalogs.Add(catalogReference);
+            }
+        }
+        else
+        {
+            createCompositePackageCatalogOptions.Catalogs.Add(_wingetCatalog);
         }
 
         // Searches only the catalogs provided, but will correlated with installed items
@@ -73,10 +84,9 @@ internal static class WinGetStatics
 
         var connectResult = await catalogRef.ConnectAsync();
         var compositeCatalog = connectResult.PackageCatalog;
-        _compositeCatalog = compositeCatalog;
 
         stopwatch.Stop();
-        Debug.WriteLine($"GetCompositeCatalog fetch took {stopwatch.ElapsedMilliseconds}ms");
+        Debug.WriteLine($"GetCompositeCatalog({all}) fetch took {stopwatch.ElapsedMilliseconds}ms");
 
         return compositeCatalog;
     }
