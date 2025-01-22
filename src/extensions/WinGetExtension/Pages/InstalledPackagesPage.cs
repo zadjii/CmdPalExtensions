@@ -47,7 +47,7 @@ public partial class InstalledPackagesPage : ListPage
                 var versionText = p.InstalledVersion?.Version ?? string.Empty;
 
                 Tag[] tags = string.IsNullOrEmpty(versionText) ? [] : [new Tag() { Text = versionText }];
-                return new ListItem(new InstallPackageCommand(p))
+                return new ListItem(new NoOpCommand())
                 {
                     Title = p.Name,
                     Subtitle = p.Id,

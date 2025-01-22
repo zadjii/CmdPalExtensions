@@ -6,6 +6,7 @@ using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Diagnostics.CodeAnalysis;
+using System.IO;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
@@ -29,9 +30,11 @@ internal sealed partial class WinGetExtensionPage : DynamicListPage, IDisposable
 
     private IEnumerable<CatalogPackage>? _results;
 
+    public static IconInfo WinGetIcon { get; } = new(Path.Combine(AppDomain.CurrentDomain.BaseDirectory.ToString(), "Assets\\AppList.scale-100.png"));
+
     public WinGetExtensionPage(string tag = "")
     {
-        Icon = new("\uE74C");
+        Icon = WinGetIcon;
         Name = "Search Winget";
         _tag = tag;
         ShowDetails = true;

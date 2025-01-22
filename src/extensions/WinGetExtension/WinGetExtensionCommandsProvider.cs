@@ -4,7 +4,6 @@
 
 using Microsoft.CmdPal.Extensions;
 using Microsoft.CmdPal.Extensions.Helpers;
-using WinGetExtension.Pages;
 
 namespace WinGetExtension;
 
@@ -14,6 +13,7 @@ public partial class WinGetExtensionActionsProvider : CommandProvider
     {
         DisplayName = "WinGet for the Command Palette";
         _ = WinGetStatics.Manager;
+        Icon = WinGetExtensionPage.WinGetIcon;
 
         // _ = Task.Run(async () => await WinGetStatics.CompositeAllCatalog);
         // _ = Task.Run(async () => await WinGetStatics.CompositeWingetCatalog);
@@ -26,7 +26,8 @@ public partial class WinGetExtensionActionsProvider : CommandProvider
         {
             Title = "Search for command-line packages",
         },
-        new ListItem(new InstalledPackagesPage())
+
+        // new ListItem(new InstalledPackagesPage())
     ];
 
     public override ICommandItem[] TopLevelCommands() => _commands;

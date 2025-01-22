@@ -12,14 +12,14 @@ namespace WinGetExtension.Pages;
 public partial class InstallPackageListItem : ListItem
 {
     private readonly CatalogPackage _package;
-    private readonly InstallPackageCommand _installCommand;
+    private InstallPackageCommand? _installCommand;
 
     public InstallPackageListItem(CatalogPackage package)
-        : base(new InstallPackageCommand(package))
+        : base(new NoOpCommand())
     {
         _package = package;
-        _installCommand = (InstallPackageCommand)Command!;
 
+        // _installCommand = (InstallPackageCommand)Command!;
         var version = _package.DefaultInstallVersion;
         var versionText = version.Version;
         var versionTagText = versionText == "Unknown" && version.PackageCatalog.Info.Id == "StoreEdgeFD" ? "msstore" : versionText;
@@ -47,10 +47,13 @@ public partial class InstallPackageListItem : ListItem
     {
         var status = await _package.CheckInstalledStatusAsync();
         var isInstalled = _package.InstalledVersion != null;
-        Icon = new(isInstalled ? "\uE930" : "\uE896"); // Completed : Download
-        _installCommand.Icon = Icon;
-        _installCommand.Name = isInstalled ? "Installed" : "Install";
+        _installCommand = new InstallPackageCommand(_package, isInstalled);
+        this.Command = _installCommand;
 
+        Icon = _installCommand.Icon;
+
+        // _installCommand.Icon = Icon;
+        // _installCommand.Name = isInstalled ? "Installed" : "Install";
         if (status.Status == CheckInstalledStatusResultStatus.Ok)
         {
             var l = status.PackageInstalledStatus;
