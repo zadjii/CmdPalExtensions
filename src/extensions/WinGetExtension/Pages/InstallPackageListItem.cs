@@ -3,9 +3,12 @@
 // See the LICENSE file in the project root for more information.
 
 using System;
+using System.Diagnostics;
+using System.Linq;
 using System.Threading.Tasks;
 using Microsoft.CmdPal.Extensions.Helpers;
 using Microsoft.Management.Deployment;
+using Windows.Foundation.Metadata;
 
 namespace WinGetExtension.Pages;
 
@@ -49,15 +52,44 @@ public partial class InstallPackageListItem : ListItem
         var isInstalled = _package.InstalledVersion != null;
         _installCommand = new InstallPackageCommand(_package, isInstalled);
         this.Command = _installCommand;
-
         Icon = _installCommand.Icon;
 
-        // _installCommand.Icon = Icon;
-        // _installCommand.Name = isInstalled ? "Installed" : "Install";
-        if (status.Status == CheckInstalledStatusResultStatus.Ok)
+        _installCommand.InstallStateChanged += InstallStateChangedHandler;
+    }
+
+    private void InstallStateChangedHandler(object? sender, InstallPackageCommand e)
+    {
+        if (!ApiInformation.IsApiContractPresent("Microsoft.Management.Deployment", 12))
         {
-            var l = status.PackageInstalledStatus;
-            _ = l;
+            Debug.WriteLine($"RefreshPackageCatalogAsync isn't available");
+            e.FakeChangeStatus();
+            Command = e;
+            Icon = Command.Icon;
+            return;
         }
+
+        _ = Task.Run(() =>
+        {
+            Stopwatch s = new();
+            Debug.WriteLine($"Starting RefreshPackageCatalogAsync");
+            s.Start();
+            var refs = WinGetStatics.AvailableCatalogs.ToArray();
+
+            foreach (var catalog in refs)
+            {
+                var operation = catalog.RefreshPackageCatalogAsync();
+                operation.Wait();
+            }
+
+            s.Stop();
+            Debug.WriteLine($"  RefreshPackageCatalogAsync took {s.ElapsedMilliseconds}ms");
+        }).ContinueWith((previous) =>
+        {
+            if (previous.IsCompletedSuccessfully)
+            {
+                Debug.WriteLine($"Updating InstalledStatus");
+                UpdatedInstalledStatus();
+            }
+        });
     }
 }

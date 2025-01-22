@@ -22,43 +22,40 @@ public partial class InstallPackageCommand : InvokableCommand
 
     public bool IsInstalled { get; private set; }
 
+    public static IconInfo CompletedIcon { get; } = new("\uE930"); // Completed
+
+    public static IconInfo DownloadIcon { get; } = new("\uE896"); // Download
+
+    public event EventHandler<InstallPackageCommand>? InstallStateChanged;
+
     public InstallPackageCommand(CatalogPackage package, bool isInstalled)
     {
         _package = package;
         IsInstalled = isInstalled;
+        UpdateAppearance();
+    }
 
-        Icon = new(isInstalled ? "\uE930" : "\uE896"); // Completed : Download
-        Name = isInstalled ? "Uninstall" : "Install";
+    internal void FakeChangeStatus()
+    {
+        IsInstalled = !IsInstalled;
+        UpdateAppearance();
+    }
+
+    private void UpdateAppearance()
+    {
+        Icon = IsInstalled ? CompletedIcon : DownloadIcon;
+        Name = IsInstalled ? "Uninstall" : "Install";
     }
 
     public override ICommandResult Invoke()
     {
-        // var result = _package.CheckInstalledStatus();
-        // if (result.Status == CheckInstalledStatusResultStatus.Ok)
-        // {
-        //    var isInstalled = _package.InstalledVersion != null;
+        // TODO: LOCK in here, so this can only be invoked once until the
+        // install / uninstall is done. Just use like, an atomic
+        if (_installTask != null)
+        {
+            return CommandResult.KeepOpen();
+        }
 
-        // if (isInstalled)
-        //    {
-        //        _installBanner.State = MessageState.Info;
-        //        _installBanner.Message = $"{_package.Name} is already installed";
-        //        ExtensionHost.ShowStatus(_installBanner);
-
-        // // TODO Derp, didn't expose HideStatus from API
-        //        // _ = Task.Run(() =>
-        //        // {
-        //        //    Thread.Sleep(2000);
-        //        //    ExtensionHost.HideStatus(_installBanner);
-        //        // });
-        //    }
-        //    else
-        //    {
-        // _ = Task.Run(() =>
-        // {
-        //    Thread.Sleep(2000);
-        //    _installBanner.State = MessageState.Success;
-        //    _installBanner.Message = $"Successfully installed {_package.Name}";
-        // });
         if (IsInstalled)
         {
             // Uninstall
@@ -70,18 +67,10 @@ public partial class InstallPackageCommand : InvokableCommand
             installOptions.PackageUninstallScope = PackageUninstallScope.Any;
             _unInstallAction = WinGetStatics.Manager.UninstallPackageAsync(_package, installOptions);
 
-            _installTask = Task.Run(async () =>
-            {
-                try
-                {
-                    await _unInstallAction.AsTask();
-                }
-                catch (Exception ex)
-                {
-                    _installBanner.State = MessageState.Error;
-                    _installBanner.Message = ex.Message;
-                }
-            });
+            var handler = new AsyncOperationProgressHandler<UninstallResult, UninstallProgress>(OnUninstallProgress);
+            _unInstallAction.Progress = handler;
+
+            _installTask = Task.Run(() => TryDoInstallOperation(_unInstallAction));
         }
         else
         {
@@ -97,27 +86,31 @@ public partial class InstallPackageCommand : InvokableCommand
             var handler = new AsyncOperationProgressHandler<InstallResult, InstallProgress>(OnInstallProgress);
             _installAction.Progress = handler;
 
-            _installTask = Task.Run(async () =>
-            {
-                try
-                {
-                    await _installAction.AsTask();
-                    _installBanner.Message = $"Finished install for {_package.Name}";
-                    _installBanner.Progress = null;
-                    _installBanner.State = MessageState.Success;
-                }
-                catch (Exception ex)
-                {
-                    _installBanner.State = MessageState.Error;
-                    _installBanner.Progress = null;
-                    _installBanner.Message = ex.Message;
-                }
-            });
+            _installTask = Task.Run(() => TryDoInstallOperation(_installAction));
         }
 
-        // }
-        // }
         return CommandResult.KeepOpen();
+    }
+
+    private async void TryDoInstallOperation<TOperation, TProgress>(
+        IAsyncOperationWithProgress<TOperation, TProgress> action)
+    {
+        try
+        {
+            await action.AsTask();
+            _installBanner.Message = $"Finished {(IsInstalled ? "uninstall" : "install")} for {_package.Name}";
+            _installBanner.Progress = null;
+            _installBanner.State = MessageState.Success;
+            _installTask = null;
+            InstallStateChanged?.Invoke(this, this);
+        }
+        catch (Exception ex)
+        {
+            _installBanner.State = MessageState.Error;
+            _installBanner.Progress = null;
+            _installBanner.Message = ex.Message;
+            _installTask = null;
+        }
     }
 
     private static string FormatBytes(ulong bytes)
@@ -146,8 +139,14 @@ public partial class InstallPackageCommand : InvokableCommand
                 _installBanner.Message = $"Queued {_package.Name} for download...";
                 break;
             case PackageInstallProgressState.Downloading:
-                downloadText += $"{FormatBytes(progress.BytesDownloaded)} of {FormatBytes(progress.BytesRequired)}";
-                _installBanner.Message = downloadText;
+                if (progress.BytesRequired > 0)
+                {
+                    downloadText += $"{FormatBytes(progress.BytesDownloaded)} of {FormatBytes(progress.BytesRequired)}";
+                    _installBanner.Progress ??= new ProgressState() { IsIndeterminate = false };
+                    ((ProgressState)_installBanner.Progress).ProgressPercent = (uint)(progress.BytesDownloaded / progress.BytesRequired * 100);
+                    _installBanner.Message = downloadText;
+                }
+
                 break;
             case PackageInstallProgressState.Installing:
                 _installBanner.Message = $"Installing {_package.Name}...";
@@ -160,6 +159,34 @@ public partial class InstallPackageCommand : InvokableCommand
                 _installBanner.Message = "Finished install.";
 
                 // progressBar.IsIndeterminate(false);
+                _installBanner.Progress = null;
+                _installBanner.State = MessageState.Success;
+                break;
+            default:
+                _installBanner.Message = string.Empty;
+                break;
+        }
+    }
+
+    private void OnUninstallProgress(
+        IAsyncOperationWithProgress<UninstallResult, UninstallProgress> operation,
+        UninstallProgress progress)
+    {
+        switch (progress.State)
+        {
+            case PackageUninstallProgressState.Queued:
+                _installBanner.Message = $"Queued {_package.Name} for uninstall...";
+                break;
+
+            case PackageUninstallProgressState.Uninstalling:
+                _installBanner.Message = $"Uninstalling {_package.Name}...";
+                _installBanner.Progress = new ProgressState() { IsIndeterminate = true };
+                break;
+            case PackageUninstallProgressState.PostUninstall:
+                _installBanner.Message = $"Finishing uninstall for {_package.Name}...";
+                break;
+            case PackageUninstallProgressState.Finished:
+                _installBanner.Message = "Finished uninstall.";
                 _installBanner.Progress = null;
                 _installBanner.State = MessageState.Success;
                 break;
