@@ -51,7 +51,8 @@ internal static class WinGetStatics
         _ = Task.Run(() =>
         {
             _ = CompositeAllCatalog.Value;
-            _ = CompositeWingetCatalog.Value;
+
+            // _ = CompositeWingetCatalog.Value;
         });
     }
 
