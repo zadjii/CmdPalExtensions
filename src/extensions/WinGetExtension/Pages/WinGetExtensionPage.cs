@@ -88,7 +88,12 @@ internal sealed partial class WinGetExtensionPage : DynamicListPage, IDisposable
     private void DoUpdateSearchText(string newSearch)
     {
         // Cancel any ongoing search
-        _cancellationTokenSource?.Cancel();
+        if (_cancellationTokenSource != null)
+        {
+            Debug.WriteLine("Cancelling old search");
+            _cancellationTokenSource.Cancel();
+        }
+
         _cancellationTokenSource = new CancellationTokenSource();
 
         var cancellationToken = _cancellationTokenSource.Token;
@@ -198,8 +203,10 @@ internal sealed partial class WinGetExtensionPage : DynamicListPage, IDisposable
 
             // Find the packages with the filters
             var request = catalog.FindPackagesAsync(opts);
-            var cancellable = AsTaskWithCancellation(request, ct);
+            Debug.WriteLine($"    immediately after FindPackagesAsync ({query})");
+            var cancellable = AsTaskWithCancellation(request, ct, searchDebugText);
             var searchResults = await cancellable;
+            Debug.WriteLine($"    got results for ({query})");
             foreach (var match in searchResults.Matches.ToArray())
             {
                 ct.ThrowIfCancellationRequested();
@@ -222,7 +229,10 @@ internal sealed partial class WinGetExtensionPage : DynamicListPage, IDisposable
 
     public void Dispose() => throw new NotImplementedException();
 
-    private static async Task<T> AsTaskWithCancellation<T>(Windows.Foundation.IAsyncOperation<T> operation, CancellationToken cancellationToken)
+    private static async Task<T> AsTaskWithCancellation<T>(
+        Windows.Foundation.IAsyncOperation<T> operation,
+        CancellationToken cancellationToken,
+        string label = "")
     {
         // Create a TaskCompletionSource to wrap the IAsyncOperation
         var tcs = new TaskCompletionSource<T>();
@@ -249,6 +259,7 @@ internal sealed partial class WinGetExtensionPage : DynamicListPage, IDisposable
         {
             try
             {
+                Debug.WriteLine($"    Cancelling {label} via token...");
                 operation.Cancel();
             }
             catch
@@ -257,6 +268,8 @@ internal sealed partial class WinGetExtensionPage : DynamicListPage, IDisposable
             }
         }))
         {
+            Debug.WriteLine($"    starting await in AsTaskWithCancellation({label})...");
+
             // Await the TaskCompletionSource's task
             return await tcs.Task;
         }
