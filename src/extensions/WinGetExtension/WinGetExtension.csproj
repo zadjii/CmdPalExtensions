@@ -66,8 +66,10 @@
     </PackageReference>
   </ItemGroup>
   <Target Name="CopyWinmdToTargetDir" BeforeTargets="BeforeBuild">
-    <Copy SourceFiles="$(PkgMicrosoft_WindowsPackageManager_ComInterop)\lib\Microsoft.Management.Deployment.winmd" DestinationFolder="$(TargetDir)" />
-    <Copy SourceFiles="$(PkgMicrosoft_WindowsPackageManager_ComInterop)\runtimes\win10-$(Platform)\native\winrtact.dll" DestinationFolder="$(TargetDir)" />
+    <!-- Before v1.10 of this package, it wasn't in the uap10.0 dir:  -->
+    <!-- <Copy SourceFiles="$(PkgMicrosoft_WindowsPackageManager_ComInterop)\lib\Microsoft.Management.Deployment.winmd" DestinationFolder="$(TargetDir)" /> -->
+    <Copy SourceFiles="$(PkgMicrosoft_WindowsPackageManager_ComInterop)\lib\uap10.0\Microsoft.Management.Deployment.winmd" DestinationFolder="$(TargetDir)" />
+    <!-- <Copy SourceFiles="$(PkgMicrosoft_WindowsPackageManager_ComInterop)\runtimes\win10-$(Platform)\native\winrtact.dll" DestinationFolder="$(TargetDir)" /> -->
   </Target>
 
   <!--
