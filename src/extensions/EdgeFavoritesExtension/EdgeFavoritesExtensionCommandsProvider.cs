@@ -3,8 +3,8 @@
 // See the LICENSE file in the project root for more information.
 
 using System.Linq;
-using Microsoft.CmdPal.Extensions;
-using Microsoft.CmdPal.Extensions.Helpers;
+using Microsoft.CommandPalette.Extensions;
+using Microsoft.CommandPalette.Extensions.Toolkit;
 using static EdgeFavoritesExtension.EdgeFavoritesApi;
 
 namespace EdgeFavoritesExtension;
@@ -25,14 +25,15 @@ public partial class EdgeFavoritesExtensionActionsProvider : CommandProvider
             EdgeFavoritesApi.Branding.Dev,
         };
 
-        Settings = new CommandSettings();
-
+        // Settings = new CommandSettings();
         _commands = brandings.Where(HasBranding).Select(b =>
         {
             return new CommandItem(new EdgeFavoritesExtensionPage(b))
             {
                 Subtitle = $"Favorites (bookmarks) from {BrandingName(b)}",
-                MoreCommands = [new CommandContextItem(Settings.SettingsPage)],
+
+                // MoreCommands = [new CommandContextItem(Settings.SettingsPage)],
+                MoreCommands = [new CommandContextItem(new SettingsPage())],
             };
         }).ToArray();
     }
@@ -52,10 +53,10 @@ public partial class SettingsPage : FormPage
     public override IForm[] Forms() => SettingsManager.Instance.Settings.ToForms();
 }
 
-[System.Diagnostics.CodeAnalysis.SuppressMessage("StyleCop.CSharp.MaintainabilityRules", "SA1402:File may only contain a single type", Justification = "Sample code")]
-public partial class CommandSettings : ICommandSettings
-{
-    private readonly SettingsPage _settingsPage = new();
+// [System.Diagnostics.CodeAnalysis.SuppressMessage("StyleCop.CSharp.MaintainabilityRules", "SA1402:File may only contain a single type", Justification = "Sample code")]
+// public partial class CommandSettings : ICommandSettings
+// {
+//    private readonly SettingsPage _settingsPage = new();
 
-    public IFormPage SettingsPage => _settingsPage;
-}
+// public IFormPage SettingsPage => _settingsPage;
+// }

@@ -11,8 +11,8 @@ using System.Net.Http;
 using System.Text.Json;
 using System.Text.Json.Nodes;
 using System.Threading.Tasks;
-using Microsoft.CmdPal.Extensions;
-using Microsoft.CmdPal.Extensions.Helpers;
+using Microsoft.CommandPalette.Extensions;
+using Microsoft.CommandPalette.Extensions.Toolkit;
 using Microsoft.Extensions.Configuration;
 using RestSharp;
 using Windows.Foundation;
@@ -64,7 +64,7 @@ internal sealed partial class MastodonExtensionPage : ListPage
             {
                 Title = p.Account.DisplayName, // p.ContentAsPlainText(),
                 Subtitle = $"@{p.Account.Username}",
-                Icon = new(p.Account.Avatar),
+                Icon = new IconInfo(p.Account.Avatar),
 
                 // *
                 Tags = tags.ToArray(), // */
@@ -105,13 +105,13 @@ internal sealed partial class MastodonExtensionPage : ListPage
         List<Tag> tags = [];
         tags.Add(new Tag()
         {
-            Icon = p.Favorited ? new("\uE735") : new("\ue734"), // FavoriteStar
+            Icon = p.Favorited ? new IconInfo("\uE735") : new IconInfo("\ue734"), // FavoriteStar
             Text = p.Favorites.ToString(CultureInfo.CurrentCulture),
             Foreground = p.Favorited ? ColorHelpers.FromArgb(255, 202, 143, 4) : ColorHelpers.NoColor(),
         });
         tags.Add(new Tag()
         {
-            Icon = new("\uE8EB"), // Reshare, there is no filled share
+            Icon = new IconInfo("\uE8EB"), // Reshare, there is no filled share
             Text = p.Boosts.ToString(CultureInfo.CurrentCulture),
             Foreground = p.Reblogged ? ColorHelpers.FromArgb(255, 111, 112, 199) : ColorHelpers.NoColor(),
         });
@@ -119,7 +119,7 @@ internal sealed partial class MastodonExtensionPage : ListPage
         {
             tags.Add(new Tag()
             {
-                Icon = new("\uE97A"), // Reply
+                Icon = new IconInfo("\uE97A"), // Reply
                 Text = p.Replies.ToString(CultureInfo.CurrentCulture),
             });
         }
@@ -574,12 +574,12 @@ public partial class FavoritePostCommand : InvokableCommand
         if (_post.Favorited)
         {
             this.Name = "Unfavorite";
-            this.Icon = new("\uE8D9");
+            this.Icon = new IconInfo("\uE8D9");
         }
         else
         {
             this.Name = "Favorite";
-            this.Icon = new("\uE735");
+            this.Icon = new IconInfo("\uE735");
         }
     }
 

@@ -11,8 +11,8 @@ using System.Threading.Tasks;
 using System.Xml.Linq;
 using HackerNewsExtension.Commands;
 using HackerNewsExtension.Data;
-using Microsoft.CmdPal.Extensions;
-using Microsoft.CmdPal.Extensions.Helpers;
+using Microsoft.CommandPalette.Extensions;
+using Microsoft.CommandPalette.Extensions.Toolkit;
 
 namespace HackerNewsExtension;
 

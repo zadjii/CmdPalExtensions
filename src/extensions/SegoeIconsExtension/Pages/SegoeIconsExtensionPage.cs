@@ -8,8 +8,8 @@ using System.IO;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
-using Microsoft.CmdPal.Extensions;
-using Microsoft.CmdPal.Extensions.Helpers;
+using Microsoft.CommandPalette.Extensions;
+using Microsoft.CommandPalette.Extensions.Toolkit;
 
 namespace SegoeIconsExtension;
 
@@ -57,7 +57,7 @@ internal sealed partial class SegoeIconsExtensionPage : ListPage
         var items = rawIcons.Select(ToItem).ToArray();
         IsLoading = false;
         timer.Stop();
-        Debug.WriteLine($"Generating icons took {timer.ElapsedMilliseconds}ms");
+        ExtensionHost.LogMessage($"Generating icon items took {timer.ElapsedMilliseconds}ms");
         return items;
     }
 
@@ -74,7 +74,7 @@ internal sealed partial class IconListItem : ListItem
     {
         _data = data;
         this.Title = _data.Name;
-        this.Icon = new(data.Character);
+        this.Icon = new IconInfo(data.Character);
         this.Subtitle = _data.CodeGlyph;
         if (data.Tags != null && data.Tags.Length > 0)
         {
@@ -83,7 +83,7 @@ internal sealed partial class IconListItem : ListItem
 
         this.MoreCommands =
         [
-            new CommandContextItem(new CopyTextCommand(data.Character)) { Title = $"Copy {data.Character}", Icon = new(data.Character) },
+            new CommandContextItem(new CopyTextCommand(data.Character)) { Title = $"Copy {data.Character}", Icon = new IconInfo(data.Character) },
             new CommandContextItem(new CopyTextCommand(data.TextGlyph)) { Title = $"Copy {data.TextGlyph}" },
             new CommandContextItem(new CopyTextCommand(data.Name)) { Title = $"Copy {data.Name}" },
         ];

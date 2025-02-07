@@ -4,7 +4,7 @@
 
 using System.Diagnostics;
 using HackerNewsExtension.Data;
-using Microsoft.CmdPal.Extensions.Helpers;
+using Microsoft.CommandPalette.Extensions.Toolkit;
 
 namespace HackerNewsExtension.Commands;
 

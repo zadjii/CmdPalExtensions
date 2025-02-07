@@ -4,10 +4,12 @@
 
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.IO;
 using System.Reflection;
 using System.Text.Json;
 using System.Threading.Tasks;
+using Microsoft.CommandPalette.Extensions.Toolkit;
 
 namespace SegoeIconsExtension;
 
@@ -64,6 +66,8 @@ internal sealed class IconsDataSource
             }
         }
 
+        Stopwatch stopwatch = new();
+        stopwatch.Start();
         var jsonText = await LoadText("Assets/icons.json");
         lock (_lock)
         {
@@ -73,6 +77,9 @@ internal sealed class IconsDataSource
                 icons = JsonSerializer.Deserialize<List<IconData>>(jsonText) is List<IconData> i ? i
                     : throw new InvalidDataException($"Cannot load icon data: {jsonText}");
             }
+
+            stopwatch.Stop();
+            ExtensionHost.LogMessage($"Reading file and parsing JSON took {stopwatch.ElapsedMilliseconds}ms");
 
             return icons;
         }

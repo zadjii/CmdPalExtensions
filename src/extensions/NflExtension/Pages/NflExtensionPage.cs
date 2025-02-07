@@ -11,8 +11,8 @@ using System.Text.Json;
 using System.Text.Json.Serialization;
 using System.Threading.Tasks;
 using System.Timers;
-using Microsoft.CmdPal.Extensions;
-using Microsoft.CmdPal.Extensions.Helpers;
+using Microsoft.CommandPalette.Extensions;
+using Microsoft.CommandPalette.Extensions.Toolkit;
 
 namespace NflExtension;
 
@@ -114,7 +114,7 @@ internal sealed partial class NflExtensionPage : ListPage, IDisposable
                         .Select(c =>
                             new Tag()
                             {
-                                Icon = new(c.Team.Id == game.Situation?.Possession ? "🏈" : string.Empty),
+                                Icon = new IconInfo(c.Team.Id == game.Situation?.Possession ? "🏈" : string.Empty),
                                 Text = $"{c.Team.Abbreviation} {c.Score}",
                                 Foreground = HexToColor(c.Team.AlternateColor),
                                 Background = HexToColor(c.Team.Color),
@@ -150,7 +150,7 @@ internal sealed partial class NflExtensionPage : ListPage, IDisposable
                 new CommandContextItem(new OpenUrlCommand("https://reddit1.nflbite.com/"))
                 {
                     Title = "Go to NFLbite",
-                    Icon = new("https://reddit1.nflbite.com/icon.png"),
+                    Icon = new IconInfo("https://reddit1.nflbite.com/icon.png"),
                 }
             ],
         };

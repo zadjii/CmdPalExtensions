@@ -10,8 +10,8 @@ using System.Linq;
 using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
-using Microsoft.CmdPal.Extensions;
-using Microsoft.CmdPal.Extensions.Helpers;
+using Microsoft.CommandPalette.Extensions;
+using Microsoft.CommandPalette.Extensions.Toolkit;
 using RestSharp;
 
 namespace TmdbExtension;
@@ -189,7 +189,7 @@ internal sealed partial class TmdbMoviePage : ListPage
         {
             Title = _movie.Title,
             Body = _movie.Overview ?? string.Empty,
-            HeroImage = new($"https://image.tmdb.org/t/p/w92/{_movie.Poster_path}"),
+            HeroImage = new IconInfo($"https://image.tmdb.org/t/p/w92/{_movie.Poster_path}"),
         };
     }
 
@@ -233,7 +233,7 @@ internal sealed partial class TmdbMoviePage : ListPage
         {
             Title = _movie.Title,
             Body = _movie.Overview ?? string.Empty,
-            HeroImage = new($"https://image.tmdb.org/t/p/w92/{_movie.Poster_path}"),
+            HeroImage = new IconInfo($"https://image.tmdb.org/t/p/w92/{_movie.Poster_path}"),
             Metadata = [new DetailsElement() { Key = "Genre", Data = new DetailsTags() { Tags = movieDetails.Genres.Select(g => new Tag() { Text = g.Name }).ToArray() } }],
         };
 
@@ -281,7 +281,7 @@ internal sealed partial class TmdbMoviePage : ListPage
                     var li = new ListItem(new NoOpCommand())
                     {
                         Title = item.Provider_name,
-                        Icon = new($"https://image.tmdb.org/t/p/w92/{item.Logo_path}"),
+                        Icon = new IconInfo($"https://image.tmdb.org/t/p/w92/{item.Logo_path}"),
                         Tags = [tag],
                         Details = Details,
                     };

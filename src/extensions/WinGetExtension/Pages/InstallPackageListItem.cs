@@ -6,7 +6,7 @@ using System;
 using System.Diagnostics;
 using System.Linq;
 using System.Threading.Tasks;
-using Microsoft.CmdPal.Extensions.Helpers;
+using Microsoft.CommandPalette.Extensions.Toolkit;
 using Microsoft.Management.Deployment;
 using Windows.Foundation.Metadata;
 
