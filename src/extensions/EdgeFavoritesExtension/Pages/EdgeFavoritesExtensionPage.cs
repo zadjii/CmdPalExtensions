@@ -128,7 +128,7 @@ _{path}_
         var page = new EdgeFavoritesFolderPage(branding, node, path);
         var newItem = new ListItem(page)
         {
-            Icon = new("\uE838"), // FolderOpen
+            Icon = new IconInfo("\uE838"), // FolderOpen
             Title = page.Title,
             Subtitle = $"{node.Children?.Count ?? 0} sub-items",
         };
