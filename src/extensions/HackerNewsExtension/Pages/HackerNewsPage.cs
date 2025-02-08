@@ -4,20 +4,25 @@
 
 using System;
 using System.Collections.Generic;
-using System.Linq;
 using System.Net.Http;
-using System.Runtime.InteropServices.WindowsRuntime;
+using System.Text.Json;
 using System.Threading.Tasks;
-using System.Xml.Linq;
-using HackerNewsExtension.Commands;
 using HackerNewsExtension.Data;
 using Microsoft.CommandPalette.Extensions;
 using Microsoft.CommandPalette.Extensions.Toolkit;
 
 namespace HackerNewsExtension;
 
-internal sealed partial class HackerNewsPage : ListPage
+internal sealed partial class HackerNewsPage : ListPage, IDisposable
 {
+    private readonly HttpClient _httpClient = new();
+    private readonly JsonSerializerOptions _jsonOptions = new() { PropertyNameCaseInsensitive = true };
+
+    private static readonly IconInfo CommentsIcon = new("\uE8F2");
+    private static readonly IconInfo PostIcon = new("\uE8A1");
+
+    private readonly List<ListItem> _lastPosts = [];
+
     public HackerNewsPage()
     {
         Icon = new("https://news.ycombinator.com/favicon.ico");
@@ -27,65 +32,140 @@ internal sealed partial class HackerNewsPage : ListPage
         ShowDetails = true;
     }
 
-    private static async Task<List<NewsPost>> GetHackerNewsTopPosts()
+    public override IListItem[] GetItems()
     {
-        var posts = new List<NewsPost>();
-
-        using (var client = new HttpClient())
+        if (_lastPosts.Count == 0)
         {
-            var response = await client.GetStringAsync("https://news.ycombinator.com/rss");
-            var xdoc = XDocument.Parse(response);
-            var x = xdoc.Descendants("item").First();
-            posts = xdoc.Descendants("item")
-                .Take(20)
-                .Select(item => new NewsPost()
-                {
-                    Title = item.Element("title")?.Value ?? string.Empty,
-                    Link = item.Element("link")?.Value ?? string.Empty,
-                    CommentsLink = item.Element("comments")?.Value ?? string.Empty,
-                }).ToList();
+            var t = FetchItems();
+            t.ConfigureAwait(false);
         }
 
-        return posts;
+        IsLoading = false;
+        return _lastPosts.ToArray();
     }
 
-    public override IListItem[] GetItems()
+    private async Task FetchItems()
+    {
+        _lastPosts.Clear();
+
+        // Fetch the list of top story IDs from Hacker News
+        var topStoriesUrl = "https://hacker-news.firebaseio.com/v0/topstories.json";
+        var topStoriesJson = await _httpClient.GetStringAsync(topStoriesUrl);
+
+        // Deserialize the JSON array into a List of integers (story IDs)
+        var topStoryIds = JsonSerializer.Deserialize<List<int>>(topStoriesJson);
+        var storiesToFetch = 25;
+
+        for (var i = 0; i < Math.Min(storiesToFetch, topStoryIds.Count); i++)
+        {
+            var storyId = topStoryIds[i];
+            var storyUrl = $"https://hacker-news.firebaseio.com/v0/item/{storyId}.json";
+
+            try
+            {
+                var storyJson = await _httpClient.GetStringAsync(storyUrl);
+
+                // Deserialize the JSON into our Story object.
+                // The option PropertyNameCaseInsensitive = true makes sure that
+                // properties like "descendants" and "score" are properly bound.
+                var story = JsonSerializer.Deserialize<NewsItem>(
+                    storyJson,
+                    _jsonOptions);
+
+                if (story != null)
+                {
+                    var targetCommand = new OpenUrlCommand(story.Url);
+                    var commentsCommand = new OpenUrlCommand(story.CommentsUrl) { Name = "View comments", Icon = CommentsIcon };
+                    ICommandContextItem[] contextMenu = [];
+                    ICommand primary;
+                    if (story.IsLink)
+                    {
+                        primary = targetCommand;
+                        contextMenu = [new CommandContextItem(commentsCommand)];
+                    }
+                    else
+                    {
+                        primary = commentsCommand;
+                    }
+
+                    var icon = story.IsLink ?
+                        await GetPostIconFromUrl(story.Url)
+                        : CommentsIcon;
+
+                    var item = new ListItem(primary)
+                    {
+                        Title = story.Title,
+                        Subtitle = story.TargetLink,
+                        Icon = icon,
+                        Tags = [
+                            new Tag($"{story.Score} points"),
+                            new Tag($"{story.Descendants}") { Icon = CommentsIcon },
+                            new Tag($"by {story.By}"),
+                        ],
+                        MoreCommands = contextMenu,
+                    };
+                    _lastPosts.Add(item);
+                }
+            }
+            catch (Exception ex)
+            {
+                ExtensionHost.LogMessage($"Error fetching story with ID {storyId}: {ex.Message}");
+            }
+        }
+    }
+
+    public void Dispose() => throw new NotImplementedException();
+
+    internal static Uri GetUri(string url)
+    {
+        Uri uri;
+        if (!Uri.TryCreate(url, UriKind.Absolute, out uri))
+        {
+            if (!Uri.TryCreate("https://" + url, UriKind.Absolute, out uri))
+            {
+                return null;
+            }
+        }
+
+        return uri;
+    }
+
+    internal async Task<IconInfo> GetPostIconFromUrl(string baseUrl)
     {
         try
         {
-            IsLoading = true;
-            var t = DoGetItems();
-            t.ConfigureAwait(false);
-            return t.Result;
+            var uri = GetUri(baseUrl);
+            if (uri != null)
+            {
+                var hostname = uri.Host;
+                var faviconUrl = $"{uri.Scheme}://{hostname}/favicon.ico";
+                var exists = await FaviconExistsAsync(faviconUrl);
+                return exists ? new IconInfo(faviconUrl) : PostIcon;
+            }
         }
-        catch (Exception ex)
+        catch (UriFormatException)
         {
-            return [
-                new ListItem(new NoOpCommand()) { Title = "Exception getting posts from HN" },
-                new ListItem(new NoOpCommand())
-                {
-                    Title = $"{ex.HResult}",
-                    Subtitle = ex.HResult == -2147023174 ? "This is probably zadjii-msft/PowerToys#181" : string.Empty,
-                },
-                new ListItem(new NoOpCommand())
-                {
-                    Title = "Stack trace",
-                    Details = new Details() { Body = $"```{ex.Source}\n{ex.StackTrace}```" },
-                },
-            ];
         }
+
+        return PostIcon;
     }
 
-    private async Task<IListItem[]> DoGetItems()
+    private async Task<bool> FaviconExistsAsync(string faviconUrl)
     {
-        var items = await GetHackerNewsTopPosts();
-        IsLoading = false;
-        var s = items.Select((post) => new ListItem(new LinkCommand(post))
+        // Prepare a HEAD request message
+        var request = new HttpRequestMessage(HttpMethod.Head, faviconUrl);
+        try
         {
-            Title = post.Title,
-            Subtitle = post.Link,
-            MoreCommands = [new CommandContextItem(new CommentCommand(post))],
-        }).ToArray();
-        return s;
+            // Send the request asynchronously
+            var response = await _httpClient.SendAsync(request);
+
+            // Check if the response status indicates success (i.e. favicon exists)
+            return response.IsSuccessStatusCode;
+        }
+        catch (HttpRequestException)
+        {
+            // An exception here likely means that the favicon was not found or another error occurred
+            return false;
+        }
     }
 }
