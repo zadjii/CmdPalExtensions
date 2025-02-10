@@ -23,6 +23,8 @@ internal sealed partial class HackerNewsPage : ListPage, IDisposable
 
     private readonly List<ListItem> _lastPosts = [];
 
+    private DateTime _lastFetch = DateTime.MinValue;
+
     public HackerNewsPage()
     {
         Icon = new("https://news.ycombinator.com/favicon.ico");
@@ -34,19 +36,24 @@ internal sealed partial class HackerNewsPage : ListPage, IDisposable
 
     public override IListItem[] GetItems()
     {
-        if (_lastPosts.Count == 0)
+        var delta = DateTime.UtcNow - _lastFetch;
+
+        if (_lastPosts.Count == 0 || delta.Minutes > 5)
         {
             var t = FetchItems();
             t.ConfigureAwait(false);
+            t.Wait();
         }
 
         IsLoading = false;
-        return _lastPosts.ToArray();
+        return [.. _lastPosts];
     }
 
     private async Task FetchItems()
     {
         _lastPosts.Clear();
+
+        _lastFetch = DateTime.UtcNow;
 
         // Fetch the list of top story IDs from Hacker News
         var topStoriesUrl = "https://hacker-news.firebaseio.com/v0/topstories.json";
