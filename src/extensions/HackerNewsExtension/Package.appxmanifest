@@ -15,7 +15,7 @@
 
   <Properties>
     <DisplayName>Hacker News for Command Palette</DisplayName>
-    <PublisherDisplayName>Microsoft Corporation</PublisherDisplayName>
+    <PublisherDisplayName>zadjii</PublisherDisplayName>
     <Logo>Assets\StoreLogo.png</Logo>
   </Properties>
 
