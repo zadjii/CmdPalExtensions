@@ -15,6 +15,7 @@ public partial class TmdbExtensionActionsProvider : CommandProvider
 {
     public static ApiConfig Config { get; } = new();
 
+    private readonly CommandContextItem _logoutItem;
     private readonly CommandItem _loginItem;
     private readonly CommandItem _searchMoviesItem;
 
@@ -23,13 +24,24 @@ public partial class TmdbExtensionActionsProvider : CommandProvider
         DisplayName = "TMDB Search Commands";
         Icon = new(Path.Combine(AppDomain.CurrentDomain.BaseDirectory.ToString(), "Assets\\Tmdb-312x276-logo.png"));
 
-        _searchMoviesItem = new CommandItem(new TmdbExtensionPage()) { Title = "Search movies on TMDB" };
-        _loginItem = new CommandItem(new TmdbLoginPage()) { Title = "Login to search TMDB for movies" };
+        _logoutItem = new CommandContextItem(new LogoutCommand())
+        {
+            Title = "Logout of TMDB",
+        };
+
+        _searchMoviesItem = new CommandItem(new TmdbExtensionPage())
+        {
+            Title = "Search movies on TMDB",
+            MoreCommands = [_logoutItem],
+        };
+        _loginItem = new CommandItem(new TmdbLoginPage())
+        {
+            Title = "Login to search TMDB for movies",
+        };
+
+        ApiConfig.UserTokenChanged += (s, e) => RaiseItemsChanged(1);
     }
 
-    // private readonly ICommandItem[] _commands = [
-    //    new CommandItem(new TmdbExtensionPage() { Title = "Search movies on TMDB" }),
-    // ];
     public override ICommandItem[] TopLevelCommands()
     {
         if (ApiConfig.HasUserToken)
@@ -43,34 +55,6 @@ public partial class TmdbExtensionActionsProvider : CommandProvider
             return [_loginItem];
         }
     }
-
-    //// FOR SETUP
-    //// ```ps1
-    //// dotnet user-secrets init
-    //// dotnet user-secrets set "keys:bearerToken" THE_TOKEN_HERE
-    //// dotnet user-secrets list
-    //// ```
-    // private void SetupApiKeys()
-    // {
-    //    // See:
-    //    // * https://techcommunity.microsoft.com/t5/apps-on-azure-blog/how-to-store-app-secrets-for-your-asp-net-core-project/ba-p/1527531
-    //    // * https://stackoverflow.com/a/62972670/1481137
-    //    var builder = new ConfigurationBuilder()
-    //        .SetBasePath(Directory.GetCurrentDirectory())
-    //        .AddUserSecrets<TmdbExtensionActionsProvider>();
-
-    // var config = builder.Build();
-    //    var secretProvider = config.Providers.First();
-    //    secretProvider.TryGet("keys:bearerToken", out var token);
-
-    // // Todo! probably throw if we fail here
-    //    if (token == null)
-    //    {
-    //        throw new InvalidDataException("Somehow, I failed to package the token into the app");
-    //    }
-
-    // BearerToken = token;
-    // }
 }
 
 [System.Diagnostics.CodeAnalysis.SuppressMessage("StyleCop.CSharp.MaintainabilityRules", "SA1402:File may only contain a single type", Justification = "Sample code")]
@@ -83,6 +67,8 @@ public partial class ApiConfig
     public static string UserBearerToken { get; private set; } = string.Empty;
 
     public static bool HasUserToken => !string.IsNullOrEmpty(UserBearerToken);
+
+    public static event EventHandler<string?>? UserTokenChanged;
 
     static ApiConfig()
     {
@@ -101,7 +87,33 @@ public partial class ApiConfig
         }
     }
 
-    public static void LoginUser(string token) => AddToVault(PasswordVaultBearerToken, token);
+    public static void LoginUser(string token)
+    {
+        ApiConfig.UserBearerToken = token;
+        AddToVault(PasswordVaultBearerToken, token);
+        UserTokenChanged?.Invoke(null, token);
+    }
+
+    public static void LogoutUser()
+    {
+        if (string.IsNullOrEmpty(ApiConfig.UserBearerToken))
+        {
+            return;
+        }
+
+        var vault = new PasswordVault();
+        var userAuthCode = new PasswordCredential()
+        {
+            Resource = ApiConfig.PasswordVaultResourceName,
+            UserName = ApiConfig.PasswordVaultBearerToken,
+            Password = ApiConfig.UserBearerToken,
+        };
+        vault.Remove(userAuthCode);
+
+        ApiConfig.UserBearerToken = string.Empty;
+
+        UserTokenChanged?.Invoke(null, null);
+    }
 
     private static PasswordVault AddToVault(string k, string v, PasswordVault? vault = null)
     {
@@ -114,6 +126,22 @@ public partial class ApiConfig
         };
         vault.Add(val);
         return vault;
+    }
+}
+
+[System.Diagnostics.CodeAnalysis.SuppressMessage("StyleCop.CSharp.MaintainabilityRules", "SA1402:File may only contain a single type", Justification = "Sample code")]
+public partial class LogoutCommand : InvokableCommand
+{
+    public LogoutCommand()
+    {
+        Name = "Logout";
+        Icon = new("\uF3B1");
+    }
+
+    public override ICommandResult Invoke()
+    {
+        ApiConfig.LogoutUser();
+        return CommandResult.GoHome();
     }
 }
 
