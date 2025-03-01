@@ -124,7 +124,7 @@ internal sealed partial class TmdbExtensionPage : DynamicListPage, IDisposable
         var client = new RestClient(options);
         var request = new RestRequest(string.Empty);
         request.AddHeader("accept", "application/json");
-        request.AddHeader("Authorization", $"Bearer {TmdbExtensionActionsProvider.BearerToken}");
+        request.AddHeader("Authorization", $"Bearer {ApiConfig.UserBearerToken}");
 
         ct.ThrowIfCancellationRequested();
 
@@ -211,7 +211,7 @@ internal sealed partial class TmdbMoviePage : ListPage
         var client = new RestClient(options);
         var request = new RestRequest(string.Empty);
         request.AddHeader("accept", "application/json");
-        request.AddHeader("Authorization", $"Bearer {TmdbExtensionActionsProvider.BearerToken}");
+        request.AddHeader("Authorization", $"Bearer {ApiConfig.UserBearerToken}");
         var response = await client.GetAsync(request);
         var content = response.Content;
 
