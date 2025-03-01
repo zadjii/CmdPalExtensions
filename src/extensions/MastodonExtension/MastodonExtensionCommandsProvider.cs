@@ -19,8 +19,8 @@ public partial class MastodonExtensionCommandsProvider : CommandProvider
     public MastodonExtensionCommandsProvider()
     {
         DisplayName = "Mastodon for CmdPal";
+        Icon = MastodonExtensionPage.MastodonIcon;
 
-        // Config.SetupApiKeys();
         _loginItem = new CommandItem(new MastodonLoginPage());
         _exploreItem = new CommandItem(new MastodonExtensionPage(isExplorePage: true))
         {

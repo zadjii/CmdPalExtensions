@@ -22,6 +22,7 @@ internal sealed partial class MastodonExtensionPage : ListPage
 {
     public static readonly string ExploreUrl = "https://mastodon.social/api/v1/trends/statuses";
     public static readonly string HomeUrl = "https://mastodon.social/api/v1/timelines/home";
+    public static readonly IconInfo MastodonIcon = new("https://mastodon.social/packs/media/icons/android-chrome-36x36-4c61fdb42936428af85afdbf8c6a45a8.png");
 
     internal static readonly HttpClient Client = new();
     internal static readonly JsonSerializerOptions Options = new() { PropertyNameCaseInsensitive = true };
@@ -36,7 +37,7 @@ internal sealed partial class MastodonExtensionPage : ListPage
         _statusesUrl = isExplorePage ? ExploreUrl : HomeUrl;
         _needsLogin = !isExplorePage;
 
-        Icon = new("https://mastodon.social/packs/media/icons/android-chrome-36x36-4c61fdb42936428af85afdbf8c6a45a8.png");
+        Icon = MastodonIcon;
         Name = "Mastodon";
         Title = isExplorePage ? "Explore" : "Home";
         ShowDetails = true;

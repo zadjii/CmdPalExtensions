@@ -26,9 +26,6 @@ public partial class ApiConfig
 
     public static string UserBearerToken { get; private set; } = string.Empty;
 
-    // public static string UserAuthorizationCode { get; private set; } = string.Empty;
-
-    // public static bool IsLoggedIn => !string.IsNullOrEmpty(UserAuthorizationCode);
     public static bool HasUserToken => !string.IsNullOrEmpty(UserBearerToken);
 
     public static bool HasAppId => !string.IsNullOrEmpty(ClientId) && !string.IsNullOrEmpty(ClientSecret);
@@ -58,40 +55,14 @@ public partial class ApiConfig
         }
     }
 
-    // public void SetupApiKeys()
-    // {
-    //    // See:
-    //    // * https://techcommunity.microsoft.com/t5/apps-on-azure-blog/how-to-store-app-secrets-for-your-asp-net-core-project/ba-p/1527531
-    //    // * https://stackoverflow.com/a/62972670/1481137
-    //    var builder = new ConfigurationBuilder()
-    //        .SetBasePath(Directory.GetCurrentDirectory())
-    //        .AddUserSecrets<MastodonExtensionActionsProvider>();
-
-    // var config = builder.Build();
-    //    var secretProvider = config.Providers.First();
-    //    secretProvider.TryGet("keys:client_id", out var client_id);
-
-    // // Todo! probably throw if we fail here
-    //    if (client_id == null)
-    //    {
-    //        throw new InvalidDataException("Somehow, I failed to package the token into the app");
-    //    }
-
-    // ClientId = client_id;
-
-    // secretProvider.TryGet("keys:client_secret", out var client_secret);
-
-    // // Todo! probably throw if we fail here
-    //    if (client_secret == null)
-    //    {
-    //        throw new InvalidDataException("Somehow, I failed to package the token into the app");
-    //    }
-
-    // ClientSecret = client_secret;
-    // }
     public static async Task GetClientIdAndSecret()
     {
-        // var options = new RestClientOptions($"https://mastodon.social/oauth/token");
+        // This _feels_ wrong - creating a new "app" for each user that wants
+        // to install the extension?
+        //
+        // But also, I can't find a way to do this that doesn't otherwise
+        // involve me literally standing up my own service to just hold my API
+        // client secret. That's wacky.
         var client = new RestClient("https://mastodon.social");
         var endpoint = "/api/v1/apps";
         var request = new RestRequest(endpoint, Method.Post);
@@ -103,12 +74,6 @@ public partial class ApiConfig
         request.AddParameter("scopes", "read write push");
         request.AddParameter("website", "https://github.com/zadjii/CmdPalExtensions");
 
-        // request.AddParameter("client_id", $"{ApiConfig.ClientId}");
-        // request.AddParameter("client_secret", $"{ApiConfig.ClientSecret}");
-        // request.AddParameter("redirect_uri", "urn:ietf:wg:oauth:2.0:oob");
-        // request.AddParameter("grant_type", "authorization_code");
-        // request.AddParameter("code", $"{authCode}");
-        // request.AddParameter("scope", "read write push");
         var response = await client.ExecuteAsync(request);
         var content = response.Content;
         try
@@ -151,7 +116,6 @@ public partial class ApiConfig
 
     private static async Task GetUserToken(string authCode)
     {
-        // var options = new RestClientOptions($"https://mastodon.social/oauth/token");
         var client = new RestClient("https://mastodon.social");
         var endpoint = "/oauth/token";
         var request = new RestRequest(endpoint, Method.Post);
