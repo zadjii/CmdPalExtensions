@@ -5,7 +5,6 @@
 using System;
 using System.Collections.Generic;
 using System.Globalization;
-using System.IO;
 using System.Linq;
 using System.Net.Http;
 using System.Text.Json;
@@ -13,10 +12,8 @@ using System.Text.Json.Nodes;
 using System.Threading.Tasks;
 using Microsoft.CommandPalette.Extensions;
 using Microsoft.CommandPalette.Extensions.Toolkit;
-using Microsoft.Extensions.Configuration;
 using RestSharp;
 using Windows.Foundation;
-using Windows.Security.Credentials;
 
 namespace MastodonExtension;
 
@@ -210,196 +207,6 @@ internal sealed partial class MastodonExtensionPage : ListPage
         IsLoading = false;
 
         return statuses;
-    }
-}
-
-[System.Diagnostics.CodeAnalysis.SuppressMessage("StyleCop.CSharp.MaintainabilityRules", "SA1402:File may only contain a single type", Justification = "This is sample code")]
-public partial class ApiConfig
-{
-    public static readonly string PasswordVaultResourceName = "MastodonExtensionKeys";
-    public static readonly string PasswordVaultUserCodeName = "UserCodeKey";
-
-    public static string ClientId { get; private set; } = string.Empty;
-
-    public static string ClientSecret { get; private set; } = string.Empty;
-
-    public static string AppBearerToken { get; private set; } = string.Empty;
-
-    public static string UserBearerToken { get; private set; } = string.Empty;
-
-    // public static string UserAuthorizationCode { get; private set; } = string.Empty;
-
-    // public static bool IsLoggedIn => !string.IsNullOrEmpty(UserAuthorizationCode);
-    public static bool HasUserToken => !string.IsNullOrEmpty(UserBearerToken);
-
-    public void SetupApiKeys()
-    {
-        // See:
-        // * https://techcommunity.microsoft.com/t5/apps-on-azure-blog/how-to-store-app-secrets-for-your-asp-net-core-project/ba-p/1527531
-        // * https://stackoverflow.com/a/62972670/1481137
-        var builder = new ConfigurationBuilder()
-            .SetBasePath(Directory.GetCurrentDirectory())
-            .AddUserSecrets<MastodonExtensionActionsProvider>();
-
-        var config = builder.Build();
-        var secretProvider = config.Providers.First();
-        secretProvider.TryGet("keys:client_id", out var client_id);
-
-        // Todo! probably throw if we fail here
-        if (client_id == null)
-        {
-            throw new InvalidDataException("Somehow, I failed to package the token into the app");
-        }
-
-        ClientId = client_id;
-
-        secretProvider.TryGet("keys:client_secret", out var client_secret);
-
-        // Todo! probably throw if we fail here
-        if (client_secret == null)
-        {
-            throw new InvalidDataException("Somehow, I failed to package the token into the app");
-        }
-
-        ClientSecret = client_secret;
-    }
-
-    private static async Task GetUserToken(string authCode)
-    {
-        // var options = new RestClientOptions($"https://mastodon.social/oauth/token");
-        var client = new RestClient("https://mastodon.social");
-        var endpoint = "/oauth/token";
-        var request = new RestRequest(endpoint, Method.Post);
-        request.AddHeader("accept", "application/json");
-        request.AddHeader("Content-Type", "application/x-www-form-urlencoded");
-
-        request.AddParameter("client_id", $"{ApiConfig.ClientId}");
-        request.AddParameter("client_secret", $"{ApiConfig.ClientSecret}");
-        request.AddParameter("redirect_uri", "urn:ietf:wg:oauth:2.0:oob");
-        request.AddParameter("grant_type", "authorization_code");
-        request.AddParameter("code", $"{authCode}");
-        request.AddParameter("scope", "read write push");
-        var response = await client.ExecuteAsync(request);
-        var content = response.Content;
-        try
-        {
-            var authToken = JsonSerializer.Deserialize<UserAuthToken>(content);
-            if (authToken == null || authToken.AccessToken == null)
-            {
-                // it no worky?
-
-                // ApiConfig.LogOutUser();
-            }
-            else
-            {
-                ApiConfig.UserBearerToken = authToken.AccessToken;
-            }
-        }
-        catch (Exception)
-        {
-            ApiConfig.LogOutUser();
-        }
-    }
-
-    public static async Task LoginUser(string code)
-    {
-        await GetUserToken(code);
-
-        if (string.IsNullOrEmpty(ApiConfig.UserBearerToken))
-        {
-            return;
-        }
-
-        var vault = new PasswordVault();
-        var userToken = new PasswordCredential()
-        {
-            Resource = ApiConfig.PasswordVaultResourceName,
-            UserName = ApiConfig.PasswordVaultUserCodeName,
-            Password = ApiConfig.UserBearerToken,
-        };
-        vault.Add(userToken);
-    }
-
-    public static void LogOutUser()
-    {
-        if (string.IsNullOrEmpty(ApiConfig.UserBearerToken))
-        {
-            return;
-        }
-
-        var vault = new PasswordVault();
-        var userAuthCode = new PasswordCredential()
-        {
-            Resource = ApiConfig.PasswordVaultResourceName,
-            UserName = ApiConfig.PasswordVaultUserCodeName,
-            Password = ApiConfig.UserBearerToken,
-        };
-        vault.Remove(userAuthCode);
-
-        UserBearerToken = null;
-    }
-
-    static ApiConfig()
-    {
-        var vault = new PasswordVault();
-        try
-        {
-            var savedClientCode = vault.Retrieve(PasswordVaultResourceName, PasswordVaultUserCodeName);
-            if (savedClientCode != null)
-            {
-                UserBearerToken = savedClientCode.Password;
-            }
-        }
-        catch (Exception)
-        {
-            // log?
-        }
-    }
-}
-
-[System.Diagnostics.CodeAnalysis.SuppressMessage("StyleCop.CSharp.MaintainabilityRules", "SA1402:File may only contain a single type", Justification = "This is sample code")]
-public partial class MastodonExtensionActionsProvider : CommandProvider
-{
-    public static ApiConfig Config { get; } = new();
-
-    private readonly CommandItem _loginItem;
-    private readonly CommandItem _exploreItem;
-    private readonly CommandItem _homeItem;
-    private readonly CommandItem _logoutItem;
-
-    public MastodonExtensionActionsProvider()
-    {
-        DisplayName = "Mastodon extension for cmdpal Commands";
-        Config.SetupApiKeys();
-
-        _loginItem = new CommandItem(new MastodonLoginPage());
-        _exploreItem = new CommandItem(new MastodonExtensionPage(isExplorePage: true))
-        {
-            Title = "Explore Mastodon",
-            Subtitle = "Explore top posts on mastodon.social",
-        };
-        _homeItem = new CommandItem(new MastodonExtensionPage(isExplorePage: false))
-        {
-            Title = "Mastodon",
-            Subtitle = "Posts from users and tags you follow on Mastodon",
-        };
-        _logoutItem = new CommandItem(new LogoutCommand())
-        {
-            Subtitle = "Log out of Mastodon",
-        };
-    }
-
-    public override ICommandItem[] TopLevelCommands()
-    {
-        if (ApiConfig.HasUserToken)
-        {
-            return [_homeItem, _exploreItem, _logoutItem];
-        }
-        else
-        {
-            ExtensionHost.LogMessage(new LogMessage() { Message = "User was not logged in" });
-            return [_loginItem, _exploreItem];
-        }
     }
 }
 

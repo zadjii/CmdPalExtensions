@@ -181,3 +181,16 @@ public class UserAuthToken
     [JsonPropertyName("created_at")]
     public int CreatedAt { get; set; }
 }
+
+[System.Diagnostics.CodeAnalysis.SuppressMessage("StyleCop.CSharp.MaintainabilityRules", "SA1402:File may only contain a single type", Justification = "This is sample code")]
+public class AppSecrets
+{
+    [JsonPropertyName("vapid_key")]
+    public string VapidKey { get; set; }
+
+    [JsonPropertyName("client_id")]
+    public string ClientId { get; set; }
+
+    [JsonPropertyName("client_secret")]
+    public string ClientSecret { get; set; }
+}
