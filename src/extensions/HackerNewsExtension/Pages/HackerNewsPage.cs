@@ -95,15 +95,15 @@ internal sealed partial class HackerNewsPage : ListPage, IDisposable
                         primary = commentsCommand;
                     }
 
-                    var icon = story.IsLink ?
-                        await GetPostIconFromUrl(story.Url)
-                        : CommentsIcon;
-
+                    // var icon = story.IsLink ?
+                    //    await GetPostIconFromUrl(story.Url)
+                    //    : CommentsIcon;
                     var item = new ListItem(primary)
                     {
                         Title = story.Title,
                         Subtitle = story.TargetLink,
-                        Icon = icon,
+
+                        // Icon = icon,
                         Tags = [
                             new Tag($"{story.Score} points"),
                             new Tag($"{story.Descendants}") { Icon = CommentsIcon },
@@ -111,6 +111,14 @@ internal sealed partial class HackerNewsPage : ListPage, IDisposable
                         ],
                         MoreCommands = contextMenu,
                     };
+
+                    _ = Task.Run(async () =>
+                    {
+                        var icon = story.IsLink ?
+                            await GetPostIconFromUrl(story.Url)
+                            : CommentsIcon;
+                        item.Icon = icon;
+                    });
                     _lastPosts.Add(item);
                 }
             }
