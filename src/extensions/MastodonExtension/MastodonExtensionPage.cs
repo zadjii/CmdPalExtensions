@@ -58,11 +58,15 @@ internal sealed partial class MastodonExtensionPage : ListPage
             var boostPostCommand = new BoostPostCommand(p);
             var boostPostItem = new CommandContextItem(boostPostCommand);
 
+            var subtitle = p.IsBoost ?
+                $"{p.Account.DisplayName} boosted @{p.RealAccount.Username}" :
+                $"@{p.Account.Username}";
+
             var postItem = new ListItem(new MastodonPostPage(p))
             {
-                Title = p.Account.DisplayName, // p.ContentAsPlainText(),
-                Subtitle = $"@{p.Account.Username}",
-                Icon = new IconInfo(p.Account.Avatar),
+                Title = p.RealAccount.DisplayName, // p.ContentAsPlainText(),
+                Subtitle = subtitle,
+                Icon = new IconInfo(p.RealAccount.Avatar),
 
                 // *
                 Tags = tags.ToArray(), // */
@@ -154,6 +158,7 @@ internal sealed partial class MastodonExtensionPage : ListPage
             this.AddPosts(posts);
         }
 
+        IsLoading = false;
         return _items
             .ToArray();
     }
@@ -169,7 +174,7 @@ internal sealed partial class MastodonExtensionPage : ListPage
             this.AddPosts(posts);
             ExtensionHost.LogMessage(new LogMessage() { Message = $"... got {posts.Count} new posts" });
 
-            this.IsLoading = false;
+            // this.IsLoading = false;
             this.RaiseItemsChanged(this._items.Count);
         }).ConfigureAwait(false);
     }
@@ -205,8 +210,7 @@ internal sealed partial class MastodonExtensionPage : ListPage
             Console.WriteLine($"An error occurred: {e.Message}");
         }
 
-        IsLoading = false;
-
+        // IsLoading = false;
         return statuses;
     }
 }

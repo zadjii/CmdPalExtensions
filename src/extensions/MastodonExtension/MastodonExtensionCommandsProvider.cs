@@ -36,6 +36,8 @@ public partial class MastodonExtensionCommandsProvider : CommandProvider
         {
             Subtitle = "Log out of Mastodon",
         };
+
+        ApiConfig.UserLoginChanged += (s, e) => RaiseItemsChanged(1);
     }
 
     public override ICommandItem[] TopLevelCommands()

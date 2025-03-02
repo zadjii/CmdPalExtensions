@@ -50,10 +50,25 @@ public class MastodonStatus
     [JsonPropertyName("media_attachments")]
     public List<MediaAttachment> MediaAttachments { get; set; }
 
+    [JsonPropertyName("reblog")]
+    public MastodonStatus Reblog { get; set; }
+
+    [JsonIgnore]
+    internal bool IsBoost => Reblog != null;
+
+    [JsonIgnore]
+    internal string RealContent => IsBoost ? Reblog.RealContent : Content;
+
+    [JsonIgnore]
+    internal MastodonAccount RealAccount => IsBoost ? Reblog.RealAccount : Account;
+
+    [JsonIgnore]
+    internal List<MediaAttachment> RealMediaAttachments => IsBoost ? Reblog.RealMediaAttachments : MediaAttachments;
+
     public string ContentAsPlainText()
     {
         var doc = new HtmlDocument();
-        doc.LoadHtml(Content);
+        doc.LoadHtml(RealContent);
         var plainTextBuilder = new StringBuilder();
         foreach (var node in doc.DocumentNode.ChildNodes)
         {
@@ -66,17 +81,24 @@ public class MastodonStatus
     public string ContentAsMarkdown(bool escapeHashtags, bool addMedia)
     {
         var doc = new HtmlDocument();
-        doc.LoadHtml(Content.Replace("<br>", "\n\n").Replace("<br />", "\n\n"));
+        doc.LoadHtml(RealContent.Replace("<br>", "\n\n").Replace("<br />", "\n\n"));
         var markdownBuilder = new StringBuilder();
+
+        if (Account != RealAccount)
+        {
+            var boostHeader = $"<sup>{Account.DisplayName} boosted</sup>\n\n";
+            markdownBuilder.Append(boostHeader);
+        }
+
         foreach (var node in doc.DocumentNode.ChildNodes)
         {
             markdownBuilder.Append(ParseNodeToMarkdown(node, escapeHashtags));
         }
 
         // change this to >1 if you want to try the HeroImage thing
-        if (addMedia && MediaAttachments.Count > 0)
+        if (addMedia && RealMediaAttachments.Count > 0)
         {
-            foreach (var mediaAttachment in MediaAttachments)
+            foreach (var mediaAttachment in RealMediaAttachments)
             {
                 // A newline in a img tag blows up the image parser :upside_down:
                 var desc = mediaAttachment.Description ?? string.Empty;

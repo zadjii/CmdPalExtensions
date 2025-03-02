@@ -26,6 +26,7 @@ internal sealed partial class TmdbExtensionPage : DynamicListPage, IDisposable
 
     public TmdbExtensionPage()
     {
+        Id = "MovieSearch";
         Icon = new(Path.Combine(AppDomain.CurrentDomain.BaseDirectory.ToString(), "Assets\\Tmdb-312x276-logo.png"));
         Name = "Search Movies";
         ShowDetails = true;
@@ -59,7 +60,6 @@ internal sealed partial class TmdbExtensionPage : DynamicListPage, IDisposable
             return;
         }
 
-        // _ = Task.Run(async () => await DoSearchAsync(newSearch));
         _ = Task.Run(async () =>
         {
             CancellationTokenSource? oldCts, currentCts;

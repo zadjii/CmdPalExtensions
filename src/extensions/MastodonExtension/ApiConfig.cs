@@ -30,6 +30,8 @@ public partial class ApiConfig
 
     public static bool HasAppId => !string.IsNullOrEmpty(ClientId) && !string.IsNullOrEmpty(ClientSecret);
 
+    public static event EventHandler<string> UserLoginChanged;
+
     static ApiConfig()
     {
         var vault = new PasswordVault();
@@ -167,6 +169,8 @@ public partial class ApiConfig
             Password = ApiConfig.UserBearerToken,
         };
         vault.Add(userToken);
+
+        UserLoginChanged?.Invoke(null, UserBearerToken);
     }
 
     public static void LogOutUser()
@@ -186,5 +190,7 @@ public partial class ApiConfig
         vault.Remove(userAuthCode);
 
         UserBearerToken = null;
+
+        UserLoginChanged?.Invoke(null, UserBearerToken);
     }
 }
