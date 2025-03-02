@@ -81,7 +81,9 @@ public class MastodonStatus
     public string ContentAsMarkdown(bool escapeHashtags, bool addMedia)
     {
         var doc = new HtmlDocument();
+
         doc.LoadHtml(RealContent.Replace("<br>", "\n\n").Replace("<br />", "\n\n"));
+
         var markdownBuilder = new StringBuilder();
 
         if (Account != RealAccount)
@@ -112,17 +114,24 @@ public class MastodonStatus
 
     private static string ParseNodeToMarkdown(HtmlNode node, bool escapeHashtags)
     {
-        var innerText = escapeHashtags ? node.InnerText.Replace("#", "\\#") : node.InnerText;
+        var innerText = escapeHashtags ?
+            node.InnerText.Replace("#", "\\#") :
+            node.InnerText;
+
+        // Multiple layers of escaping here results in "&#39;" getting an
+        // invisible backslash that you have to account for.
+        innerText = innerText.Replace("&\\#39;", "'");
+
         switch (node.Name)
         {
             case "strong":
             case "b":
-                return $"**{node.InnerText}**";
+                return $"**{innerText}**";
             case "em":
             case "i":
-                return $"*{node.InnerText}*";
+                return $"*{innerText}*";
             case "a":
-                return $"[{node.InnerText}]({node.GetAttributeValue("href", "#")})";
+                return $"[{innerText}]({node.GetAttributeValue("href", "#")})";
             case "p":
                 return $"{innerText}\n\n";
             case "li":
