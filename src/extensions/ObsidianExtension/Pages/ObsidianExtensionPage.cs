@@ -12,15 +12,18 @@ using System.Text.Json.Nodes;
 using Microsoft.CommandPalette.Extensions;
 using Microsoft.CommandPalette.Extensions.Toolkit;
 using Windows.Foundation;
+using Windows.System;
 
 namespace ObsidianExtension;
 
 internal sealed partial class ObsidianExtensionPage : ListPage
 {
+    public static readonly IconInfo ObsidianIcon = new(Path.Combine(AppDomain.CurrentDomain.BaseDirectory.ToString(), "Assets\\obsidian-logo.png"));
+
     public ObsidianExtensionPage()
     {
         // Icon = new(@"https://obsidian.md/images/obsidian-logo-gradient.svg");
-        Icon = new(Path.Combine(AppDomain.CurrentDomain.BaseDirectory.ToString(), "Assets\\obsidian-logo.png"));
+        Icon = ObsidianIcon;
         Name = "Obsidian Notes";
         PlaceholderText = "Search notes...";
         IsLoading = true;
@@ -31,11 +34,11 @@ internal sealed partial class ObsidianExtensionPage : ListPage
 
     public override IListItem[] GetItems()
     {
-        var vaultPath = SettingsManager.Instance.VaultPath; // @"C:\Users\zadji\Obsidian\Notes";
+        var vaultPath = SettingsManager.Instance.VaultPath;
         if (string.IsNullOrEmpty(vaultPath)
             || !Directory.Exists(vaultPath))
         {
-            var item = new ListItem(new SettingsPage())
+            var item = new ListItem(SettingsManager.Instance.Settings.SettingsPage)
             {
                 Title = "Open settings",
                 Subtitle = "You need to set the path to your vault first",
@@ -64,10 +67,11 @@ internal sealed partial class ObsidianExtensionPage : ListPage
             {
                 Title = n.Name,
                 Subtitle = $"{n.Folder}/",
+                Icon = previewNote.Icon,
                 MoreCommands = [
-                    new CommandContextItem(openNote),
-                    new CommandContextItem(new EditNotePage(n)),
-                    new CommandContextItem(new AppendToNotePage(n)),
+                    new CommandContextItem(openNote) { RequestedShortcut = new(VirtualKeyModifiers.Control, (int)VirtualKey.O, 0) },
+                    new CommandContextItem(new EditNotePage(n)) { RequestedShortcut = new(VirtualKeyModifiers.Control, (int)VirtualKey.E, 0) },
+                    new CommandContextItem(new AppendToNotePage(n)) { RequestedShortcut = new(VirtualKeyModifiers.Control, (int)VirtualKey.A, 0) },
                 ],
                 Details = new Details()
                 {
@@ -105,7 +109,7 @@ internal sealed partial class ObsidianExtensionPage : ListPage
 }
 
 [System.Diagnostics.CodeAnalysis.SuppressMessage("StyleCop.CSharp.MaintainabilityRules", "SA1402:File may only contain a single type", Justification = "Sample code")]
-public partial class PreviewNotePage : MarkdownPage
+public partial class PreviewNotePage : ContentPage
 {
     private readonly Note _note;
 
@@ -115,11 +119,23 @@ public partial class PreviewNotePage : MarkdownPage
         Name = "Preview";
         Title = _note.Name;
         Icon = new("\uE70B");
+
+        var openNote = new OpenUrlCommand(note.ObsidianProtocolUri)
+        {
+            Name = "Open",
+            Result = CommandResult.Dismiss(),
+        };
+        Commands = [
+            new CommandContextItem(openNote) { RequestedShortcut = new(VirtualKeyModifiers.Control, (int)VirtualKey.O, 0) },
+            new CommandContextItem(new EditNotePage(note)) { RequestedShortcut = new(VirtualKeyModifiers.Control, (int)VirtualKey.E, 0) },
+            new CommandContextItem(new AppendToNotePage(note)) { RequestedShortcut = new(VirtualKeyModifiers.Control, (int)VirtualKey.A, 0) },
+
+        ];
     }
 
-    public override string[] Bodies()
+    public override IContent[] GetContent()
     {
-        var content = _note.NoteContent();
+        var content = new MarkdownContent() { Body = _note.NoteContent() };
         return content == null ? [] : [content];
     }
 }
@@ -283,7 +299,7 @@ internal sealed partial class NewNoteCommand : InvokableCommand
 {
     public NewNoteCommand()
     {
-        Icon = new(Path.Combine(AppDomain.CurrentDomain.BaseDirectory.ToString(), "Assets\\obsidian-logo.png"));
+        Icon = ObsidianExtensionPage.ObsidianIcon;
         Name = "New note";
     }
 
@@ -302,7 +318,7 @@ internal sealed partial class OpenDailyNoteCommand : InvokableCommand
 {
     public OpenDailyNoteCommand()
     {
-        Icon = new(Path.Combine(AppDomain.CurrentDomain.BaseDirectory.ToString(), "Assets\\obsidian-logo.png"));
+        Icon = ObsidianExtensionPage.ObsidianIcon;
         Name = "Open";
     }
 
@@ -314,18 +330,6 @@ internal sealed partial class OpenDailyNoteCommand : InvokableCommand
         Process.Start(new ProcessStartInfo(uri) { UseShellExecute = true });
         return CommandResult.Dismiss();
     }
-}
-
-[System.Diagnostics.CodeAnalysis.SuppressMessage("StyleCop.CSharp.MaintainabilityRules", "SA1402:File may only contain a single type", Justification = "Sample code")]
-public partial class SettingsPage : FormPage
-{
-    public SettingsPage()
-    {
-        Name = "Settings";
-        Icon = new("\uE713"); // Settings
-    }
-
-    public override IForm[] Forms() => SettingsManager.Instance.Settings.ToForms();
 }
 
 [System.Diagnostics.CodeAnalysis.SuppressMessage("StyleCop.CSharp.MaintainabilityRules", "SA1402:File may only contain a single type", Justification = "Sample code")]

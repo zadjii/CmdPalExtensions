@@ -18,6 +18,7 @@ internal sealed partial class HackerNewsPage : ListPage, IDisposable
     private readonly HttpClient _httpClient = new();
     private readonly JsonSerializerOptions _jsonOptions = new() { PropertyNameCaseInsensitive = true };
 
+    public static readonly IconInfo HackerNewsIcon = new("https://news.ycombinator.com/favicon.ico");
     private static readonly IconInfo CommentsIcon = new("\uE8F2");
     private static readonly IconInfo PostIcon = new("\uE8A1");
 
@@ -27,7 +28,7 @@ internal sealed partial class HackerNewsPage : ListPage, IDisposable
 
     public HackerNewsPage()
     {
-        Icon = new("https://news.ycombinator.com/favicon.ico");
+        Icon = HackerNewsIcon;
         Name = "Hacker News";
         AccentColor = ColorHelpers.FromRgb(255, 102, 0);
         IsLoading = true;

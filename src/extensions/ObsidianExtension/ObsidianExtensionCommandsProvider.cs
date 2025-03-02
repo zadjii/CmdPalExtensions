@@ -19,10 +19,12 @@ public partial class ObsidianExtensionActionsProvider : CommandProvider
     public ObsidianExtensionActionsProvider()
     {
         DisplayName = "Obsidian Notes Commands";
+        Icon = ObsidianExtensionPage.ObsidianIcon;
+        Settings = SettingsManager.Instance.Settings;
         _commands = [
             new CommandItem(_notesPage)
             {
-                MoreCommands = [new CommandContextItem(new SettingsPage())],
+                MoreCommands = [new CommandContextItem(SettingsManager.Instance.Settings.SettingsPage)],
             },
             new CommandItem(_newNoteCommand) { Title = "New note", Subtitle = "Open a new note in Obsidian" },
             new CommandItem(_dailyNote) { Title = "Open daily note", Subtitle = "Open your daily note in Obsidian" },
