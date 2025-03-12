@@ -216,7 +216,7 @@ internal sealed partial class MastodonExtensionPage : ListPage
 }
 
 [System.Diagnostics.CodeAnalysis.SuppressMessage("StyleCop.CSharp.MaintainabilityRules", "SA1402:File may only contain a single type", Justification = "This is sample code")]
-public partial class MastodonPostForm : Form
+public partial class MastodonPostForm : FormContent
 {
     private readonly MastodonStatus post;
 
@@ -225,9 +225,7 @@ public partial class MastodonPostForm : Form
         this.post = post;
     }
 
-    public override string DataJson()
-    {
-        return $$"""
+    public override string DataJson => $$"""
 {
     "author_display_name": {{JsonSerializer.Serialize(post.Account.DisplayName)}},
     "author_username": {{JsonSerializer.Serialize(post.Account.Username)}},
@@ -237,20 +235,21 @@ public partial class MastodonPostForm : Form
     "post_url": "{{post.Url}}"
 }
 """;
-    }
 
-    public override ICommandResult SubmitForm(string payload) => CommandResult.Dismiss();
+    public override ICommandResult SubmitForm(string inputs) => CommandResult.Dismiss();
 
-    public override string TemplateJson()
+    public override string TemplateJson
     {
-        var img_block = string.Empty;
-        if (post.MediaAttachments.Count > 0)
+        get
         {
-            img_block = string.Join(',', post.MediaAttachments
-                .Select(media => $$""",{"type": "Image","url":"{{media.Url}}","size": "stretch"}""").ToArray());
-        }
+            var img_block = string.Empty;
+            if (post.MediaAttachments.Count > 0)
+            {
+                img_block = string.Join(',', post.MediaAttachments
+                    .Select(media => $$""",{"type": "Image","url":"{{media.Url}}","size": "stretch"}""").ToArray());
+            }
 
-        return $$"""
+            return $$"""
 {
     "$schema": "http://adaptivecards.io/schemas/adaptive-card.json",
     "type": "AdaptiveCard",
@@ -315,11 +314,12 @@ public partial class MastodonPostForm : Form
     ]
 }
 """;
+        }
     }
 }
 
 [System.Diagnostics.CodeAnalysis.SuppressMessage("StyleCop.CSharp.MaintainabilityRules", "SA1402:File may only contain a single type", Justification = "This is sample code")]
-public partial class MastodonPostPage : FormPage
+public partial class MastodonPostPage : ContentPage
 {
     private readonly MastodonStatus post;
 
@@ -329,7 +329,7 @@ public partial class MastodonPostPage : FormPage
         this.post = post;
     }
 
-    public override IForm[] Forms()
+    public override IContent[] GetContent()
     {
         var postsAsync = GetRepliesAsync();
         postsAsync.ConfigureAwait(false);
@@ -475,15 +475,15 @@ public partial class BoostPostCommand : InvokableCommand
 }
 
 [System.Diagnostics.CodeAnalysis.SuppressMessage("StyleCop.CSharp.MaintainabilityRules", "SA1402:File may only contain a single type", Justification = "This is sample code")]
-public partial class MastodonLoginForm : Form
+public partial class MastodonLoginForm : FormContent
 {
     public MastodonLoginForm()
     {
     }
 
-    public override ICommandResult SubmitForm(string payload)
+    public override ICommandResult SubmitForm(string inputs)
     {
-        var formInput = JsonNode.Parse(payload)?.AsObject();
+        var formInput = JsonNode.Parse(inputs)?.AsObject();
         if (formInput.TryGetPropertyValue("Token", out var code))
         {
             var codeString = code.ToString();
@@ -495,11 +495,13 @@ public partial class MastodonLoginForm : Form
         return CommandResult.GoHome();
     }
 
-    public override string TemplateJson()
+    public override string TemplateJson
     {
-        var browserUrl = $"https://mastodon.social/oauth/authorize?client_id={ApiConfig.ClientId}&scope=read+write+push&redirect_uri=urn:ietf:wg:oauth:2.0:oob&response_type=code";
+        get
+        {
+            var browserUrl = $"https://mastodon.social/oauth/authorize?client_id={ApiConfig.ClientId}&scope=read+write+push&redirect_uri=urn:ietf:wg:oauth:2.0:oob&response_type=code";
 
-        return $$"""
+            return $$"""
 {
     "$schema": "http://adaptivecards.io/schemas/adaptive-card.json",
     "type": "AdaptiveCard",
@@ -546,11 +548,12 @@ public partial class MastodonLoginForm : Form
     ]
 }
 """;
+        }
     }
 }
 
 [System.Diagnostics.CodeAnalysis.SuppressMessage("StyleCop.CSharp.MaintainabilityRules", "SA1402:File may only contain a single type", Justification = "This is sample code")]
-public partial class MastodonLoginPage : FormPage
+public partial class MastodonLoginPage : ContentPage
 {
     public MastodonLoginPage()
     {
@@ -562,7 +565,7 @@ public partial class MastodonLoginPage : FormPage
         AccentColor = ColorHelpers.FromRgb(99, 100, 255);
     }
 
-    public override IForm[] Forms() => [new MastodonLoginForm()];
+    public override IContent[] GetContent() => [new MastodonLoginForm()];
 }
 
 [System.Diagnostics.CodeAnalysis.SuppressMessage("StyleCop.CSharp.MaintainabilityRules", "SA1402:File may only contain a single type", Justification = "This is sample code")]

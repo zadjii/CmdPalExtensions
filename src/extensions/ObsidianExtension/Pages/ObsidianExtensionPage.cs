@@ -62,7 +62,9 @@ internal sealed partial class ObsidianExtensionPage : ListPage
             };
 
             var previewNote = new PreviewNotePage(n);
+            var details = n.Details;
 
+            // details.Title = n.Name;
             return new ListItem(previewNote)
             {
                 Title = n.Name,
@@ -73,11 +75,7 @@ internal sealed partial class ObsidianExtensionPage : ListPage
                     new CommandContextItem(new EditNotePage(n)) { RequestedShortcut = new(VirtualKeyModifiers.Control, (int)VirtualKey.E, 0) },
                     new CommandContextItem(new AppendToNotePage(n)) { RequestedShortcut = new(VirtualKeyModifiers.Control, (int)VirtualKey.A, 0) },
                 ],
-                Details = new Details()
-                {
-                    Title = n.Name,
-                    Body = n.NoteContent(),
-                },
+                Details = details,
             };
         });
         return listItems.ToArray();
@@ -135,13 +133,13 @@ public partial class PreviewNotePage : ContentPage
 
     public override IContent[] GetContent()
     {
-        var content = new MarkdownContent() { Body = _note.NoteContent() };
+        var content = new MarkdownContent() { Body = _note.Details.Body };
         return content == null ? [] : [content];
     }
 }
 
 [System.Diagnostics.CodeAnalysis.SuppressMessage("StyleCop.CSharp.MaintainabilityRules", "SA1402:File may only contain a single type", Justification = "Sample code")]
-public partial class EditNotePage : FormPage
+public partial class EditNotePage : ContentPage
 {
     private readonly Note _note;
 
@@ -153,24 +151,24 @@ public partial class EditNotePage : FormPage
         Icon = new("\uE70F"); // edit
     }
 
-    public override IForm[] Forms() => [new EditNoteForm(_note)];
+    public override IContent[] GetContent() => [new EditNoteForm(_note)];
 }
 
 [System.Diagnostics.CodeAnalysis.SuppressMessage("StyleCop.CSharp.MaintainabilityRules", "SA1402:File may only contain a single type", Justification = "Sample code")]
-public partial class EditNoteForm : Form
+public partial class EditNoteForm : FormContent
 {
     private readonly Note _note;
 
     public EditNoteForm(Note note)
     {
         _note = note;
-        Data = $$"""
+        DataJson = $$"""
 {
     "fileContent": {{JsonSerializer.Serialize(_note.NoteContent())}}
 }
 """;
 
-        Template = $$"""
+        TemplateJson = $$"""
 {
     "$schema": "http://adaptivecards.io/schemas/adaptive-card.json",
     "type": "AdaptiveCard",
@@ -199,9 +197,9 @@ public partial class EditNoteForm : Form
         ;
     }
 
-    public override ICommandResult SubmitForm(string payload)
+    public override ICommandResult SubmitForm(string inputs)
     {
-        var formInput = JsonNode.Parse(payload)?.AsObject();
+        var formInput = JsonNode.Parse(inputs)?.AsObject();
         if (formInput == null)
         {
             return CommandResult.KeepOpen();
@@ -219,7 +217,7 @@ public partial class EditNoteForm : Form
 }
 
 [System.Diagnostics.CodeAnalysis.SuppressMessage("StyleCop.CSharp.MaintainabilityRules", "SA1402:File may only contain a single type", Justification = "Sample code")]
-public partial class AppendToNotePage : FormPage
+public partial class AppendToNotePage : ContentPage
 {
     private readonly Note _note;
 
@@ -231,18 +229,18 @@ public partial class AppendToNotePage : FormPage
         Icon = new("\ued0e"); // SubscriptionAdd
     }
 
-    public override IForm[] Forms() => [new AppendToNoteForm(_note)];
+    public override IContent[] GetContent() => [new AppendToNoteForm(_note)];
 }
 
 [System.Diagnostics.CodeAnalysis.SuppressMessage("StyleCop.CSharp.MaintainabilityRules", "SA1402:File may only contain a single type", Justification = "Sample code")]
-public partial class AppendToNoteForm : Form
+public partial class AppendToNoteForm : FormContent
 {
     private readonly Note _note;
 
     public AppendToNoteForm(Note note)
     {
         _note = note;
-        Template = $$"""
+        TemplateJson = $$"""
 {
     "$schema": "http://adaptivecards.io/schemas/adaptive-card.json",
     "type": "AdaptiveCard",
@@ -275,9 +273,9 @@ public partial class AppendToNoteForm : Form
         ;
     }
 
-    public override ICommandResult SubmitForm(string payload)
+    public override ICommandResult SubmitForm(string inputs)
     {
-        var formInput = JsonNode.Parse(payload)?.AsObject();
+        var formInput = JsonNode.Parse(inputs)?.AsObject();
         if (formInput == null)
         {
             return CommandResult.GoBack();
@@ -353,19 +351,9 @@ public sealed class Note(string absolutePath)
 
     public event TypedEventHandler<Note, string> ContentChanged;
 
-    public string NoteContent()
-    {
-        try
-        {
-            var content = File.ReadAllText(AbsolutePath);
-            return content;
-        }
-        catch
-        {
-        }
+    public Details Details { get; } = new NoteDetails(absolutePath) { Title = Path.GetFileNameWithoutExtension(absolutePath) };
 
-        return null;
-    }
+    public string NoteContent() => Details.Body;
 
     public void SaveNote(string newContent)
     {
@@ -381,5 +369,34 @@ public sealed class Note(string absolutePath)
         // And Obsidian will render a <br> for a single \r, but the preview won't
         File.AppendAllText(AbsolutePath, $"\r\r{newContent}");
         ContentChanged?.Invoke(this, null);
+    }
+}
+
+[System.Diagnostics.CodeAnalysis.SuppressMessage("StyleCop.CSharp.MaintainabilityRules", "SA1402:File may only contain a single type", Justification = "Sample code")]
+internal sealed partial class NoteDetails : Details
+{
+    public override string Body { get => _fileContents.Value; set => base.Body = value; }
+
+    private readonly Lazy<string> _fileContents;
+    private readonly string _absolutePath;
+
+    private string NoteContent()
+    {
+        try
+        {
+            var content = File.ReadAllText(_absolutePath);
+            return content;
+        }
+        catch
+        {
+        }
+
+        return null;
+    }
+
+    internal NoteDetails(string absolutePath)
+    {
+        _absolutePath = absolutePath;
+        _fileContents = new(NoteContent);
     }
 }
