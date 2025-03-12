@@ -210,6 +210,9 @@ public partial class EditNoteForm : FormContent
         {
             var data = fileContent.ToString();
             _note.SaveNote(data);
+            ToastStatusMessage savedToast = new($"Saved {_note.Name}");
+            savedToast.Message.State = MessageState.Success;
+            savedToast.Show();
         }
 
         return CommandResult.KeepOpen();
