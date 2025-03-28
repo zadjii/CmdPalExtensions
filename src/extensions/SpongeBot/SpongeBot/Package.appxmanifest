@@ -9,7 +9,7 @@
   IgnorableNamespaces="uap uap3 rescap">
 
   <Identity
-    Name="SpongeBot"
+    Name="SpongeBotExtension"
     Publisher="CN=Michael Griese, O=Michael Griese, L=Verona, S=Wisconsin, C=US"
     Version="0.0.1.0" />
   <!-- When you're ready to publish your extension, you'll need to change the
@@ -47,7 +47,7 @@
         <com:Extension Category="windows.comServer">
           <com:ComServer>
             <com:ExeServer Executable="SpongeBot.exe" Arguments="-RegisterProcessAsComServer" DisplayName="Spongebot">
-              <com:Class Id="4e3a46a2-1849-47a5-9c3a-f9a39d15338f" DisplayName="Spongebot" />
+              <com:Class Id="4e3a46a2-1849-47a5-9c3a-f9a39d15339e" DisplayName="Spongebot" />
             </com:ExeServer>
           </com:ComServer>
         </com:Extension>
@@ -60,7 +60,7 @@
             <uap3:Properties>
               <CmdPalProvider>
                 <Activation>
-                  <CreateInstance ClassId="4e3a46a2-1849-47a5-9c3a-f9a39d15338f" />
+                  <CreateInstance ClassId="4e3a46a2-1849-47a5-9c3a-f9a39d15339e" />
                 </Activation>
                 <SupportedInterfaces>
                   <Commands/>
