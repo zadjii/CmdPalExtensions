@@ -7,9 +7,9 @@ using System.Runtime.InteropServices;
 using System.Threading;
 using Microsoft.CommandPalette.Extensions;
 
-namespace SpongeBotExtension;
+namespace SpongeBot;
 
-[Guid("4e3a46a2-1849-47a5-9c3a-f9a39d15338f")]
+[Guid("4e3a46a2-1849-47a5-9c3a-f9a39d15338e")]
 public sealed partial class SpongeBotExtension : IExtension, IDisposable
 {
     private readonly ManualResetEvent _extensionDisposedEvent;

@@ -24,7 +24,7 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "EdgeFavoritesExtension", "s
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SegoeIconsExtension", "src\extensions\SegoeIconsExtension\SegoeIconsExtension.csproj", "{B5F9BD31-D67B-2EF2-DE74-AE399CE32731}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SpongeBotExtension", "src\extensions\SpongeBot\SpongeBot\SpongeBotExtension.csproj", "{2DA30ED2-30DF-7FBA-739F-A5F0617199EC}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SpongeBot", "src\extensions\SpongeBot\SpongeBot\SpongeBot.csproj", "{2DA30ED2-30DF-7FBA-739F-A5F0617199EC}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
