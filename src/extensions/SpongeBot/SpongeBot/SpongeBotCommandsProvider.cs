@@ -6,7 +6,7 @@ using System.Text;
 using Microsoft.CommandPalette.Extensions;
 using Microsoft.CommandPalette.Extensions.Toolkit;
 
-namespace SpongeBot;
+namespace SpongeBotExtension;
 
 public partial class SpongeBotCommandsProvider : CommandProvider
 {
@@ -19,33 +19,10 @@ public partial class SpongeBotCommandsProvider : CommandProvider
         Frozen = false;
     }
 
-    // private readonly SpongebotPage mainPage = new();
-
-    // private readonly SpongebotSettingsPage settingsPage = new();
     public override ICommandItem[] TopLevelCommands() =>
-
-        // var settingsPath = SpongebotPage.StateJsonPath();
-        // return !File.Exists(settingsPath)
-        //    ? [new CommandItem(settingsPage) { Title = "Spongebot settings", Subtitle = "Enter your imgflip credentials" }]
-        //    : [];
         [];
 
     public override IFallbackCommandItem[]? FallbackCommands() =>
-
-        // var settingsPath = SpongebotPage.StateJsonPath();
-        // if (!File.Exists(settingsPath))
-        // {
-        //    return null;
-        // }
-
-        // var listItem = new FallbackCommandItem(mainPage, displayTitle: "Spongebob, mocking")
-        // {
-        //    MoreCommands = [
-        //        new CommandContextItem(mainPage.CopyCommand),
-        //        new CommandContextItem(settingsPage),
-        //    ],
-        // };
-        // return [listItem];
         [_fallbackSpongeTextItem];
 }
 
@@ -58,7 +35,7 @@ internal sealed partial class FallbackSpongeTextItem : FallbackCommandItem
     public FallbackSpongeTextItem()
         : base(new NoOpCommand(), "Convert text to mOcKiNg CaSe")
     {
-        Title = string.Empty;
+        Title = _copyCommand.Name = string.Empty;
         Icon = new IconInfo("https://imgflip.com/s/meme/Mocking-Spongebob.jpg");
     }
 

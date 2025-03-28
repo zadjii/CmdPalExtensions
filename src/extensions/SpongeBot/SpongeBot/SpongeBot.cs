@@ -7,16 +7,16 @@ using System.Runtime.InteropServices;
 using System.Threading;
 using Microsoft.CommandPalette.Extensions;
 
-namespace SpongeBot;
+namespace SpongeBotExtension;
 
 [Guid("4e3a46a2-1849-47a5-9c3a-f9a39d15338f")]
-public sealed partial class SpongeBot : IExtension, IDisposable
+public sealed partial class SpongeBotExtension : IExtension, IDisposable
 {
     private readonly ManualResetEvent _extensionDisposedEvent;
 
     private readonly SpongeBotCommandsProvider _provider = new();
 
-    public SpongeBot(ManualResetEvent extensionDisposedEvent)
+    public SpongeBotExtension(ManualResetEvent extensionDisposedEvent)
     {
         this._extensionDisposedEvent = extensionDisposedEvent;
     }
