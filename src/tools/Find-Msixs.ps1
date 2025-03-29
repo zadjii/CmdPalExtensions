@@ -4,7 +4,15 @@ $gitRoot
 $winui3Apps = Join-Path $gitRoot "x64\Release\WinUI3Apps"
 $winui3Apps
 $msixs = Get-ChildItem -Path $winui3Apps -Recurse -File -Filter "*.msix" -exclude "Microsoft.WindowsAppRuntime.1.6.msix"
-# $msixs
+
+# write the path of each msix (relative to the git root)
+Write-Host "Found the following msix's:"
+foreach($msix in $msixs) {
+    # Write-Host "* " + $msix.FullName
+
+    Write-Host "*" $msix.FullName.Substring($gitRoot.Length + 1) "`n"
+
+}
 
 $DestinationFolder = Join-Path $gitRoot "x64\tmp"
 
