@@ -12,6 +12,9 @@
     <PublishProfile>win-$(Platform).pubxml</PublishProfile>
     <EnableMsixTooling>true</EnableMsixTooling>
     <Nullable>enable</Nullable>
+
+    <GenerateAppxPackageOnBuild>true</GenerateAppxPackageOnBuild>
+
   </PropertyGroup>
 
   <ItemGroup>

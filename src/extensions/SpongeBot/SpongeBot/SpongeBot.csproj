@@ -13,6 +13,10 @@
     <PublishProfile>win-$(Platform).pubxml</PublishProfile>
     <EnableMsixTooling>true</EnableMsixTooling>
     <Nullable>enable</Nullable>
+
+    <GenerateAppxPackageOnBuild>true</GenerateAppxPackageOnBuild>
+    <OutputPath>$(SolutionDir)$(Platform)\$(Configuration)\WinUI3Apps\CmdPalExtensions\$(RootNamespace)</OutputPath>
+
   </PropertyGroup>
 
   <ItemGroup>
