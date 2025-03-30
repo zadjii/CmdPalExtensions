@@ -153,7 +153,6 @@ internal sealed partial class MastodonExtensionPage : ListPage
                     Subtitle = "You need to login before you can view your home timeline",
                 };
 
-                // this._items.Add(item);
                 return [item];
             }
             else
@@ -199,7 +198,6 @@ internal sealed partial class MastodonExtensionPage : ListPage
         this.AddPosts(posts);
         ExtensionHost.LogMessage(new LogMessage() { Message = $"... got {posts.Count} new posts" });
 
-        // this.IsLoading = false;
         this.RaiseItemsChanged(this._items.Count);
     }
 
@@ -215,9 +213,6 @@ internal sealed partial class MastodonExtensionPage : ListPage
                 $"{_statusesUrl}?limit={limit}";
     }
 
-    // public async Task<List<MastodonStatus>> FetchExplorePage() => await FetchExplorePage(20, 0);
-
-    // public async Task<List<MastodonStatus>> FetchExplorePage(int limit, int offset)
     public async Task<List<MastodonStatus>> FetchExplorePage(bool loadMore = false)
     {
         var statuses = new List<MastodonStatus>();
@@ -248,7 +243,6 @@ internal sealed partial class MastodonExtensionPage : ListPage
             Console.WriteLine($"An error occurred: {e.Message}");
         }
 
-        // IsLoading = false;
         return statuses;
     }
 }
