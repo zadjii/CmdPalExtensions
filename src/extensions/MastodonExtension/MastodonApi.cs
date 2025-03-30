@@ -4,6 +4,7 @@
 
 using System;
 using System.Collections.Generic;
+using System.Globalization;
 using System.Text;
 using System.Text.Json.Serialization;
 using HtmlAgilityPack;
@@ -52,6 +53,9 @@ public class MastodonStatus
 
     [JsonPropertyName("reblog")]
     public MastodonStatus Reblog { get; set; }
+
+    [JsonIgnore]
+    internal long IntId => long.Parse(Id, CultureInfo.InvariantCulture);
 
     [JsonIgnore]
     internal bool IsBoost => Reblog != null;

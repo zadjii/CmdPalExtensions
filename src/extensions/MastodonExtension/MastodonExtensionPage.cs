@@ -30,12 +30,17 @@ internal sealed partial class MastodonExtensionPage : ListPage
     private readonly List<ListItem> _items = [];
 
     private readonly string _statusesUrl = string.Empty;
-    private readonly bool _needsLogin;
+
+    private bool IsHomePage { get; }
+
+    private bool IsExplorePage => !IsHomePage;
+
+    private long _oldestId = long.MaxValue;
 
     public MastodonExtensionPage(bool isExplorePage = true)
     {
         _statusesUrl = isExplorePage ? ExploreUrl : HomeUrl;
-        _needsLogin = !isExplorePage;
+        IsHomePage = !isExplorePage;
 
         Icon = MastodonIcon;
         Name = "Mastodon";
@@ -99,6 +104,10 @@ internal sealed partial class MastodonExtensionPage : ListPage
                 boostPostItem.Icon = boostPostCommand.Icon;
             };
             this._items.Add(postItem);
+            if (p.IntId < _oldestId)
+            {
+                _oldestId = p.IntId;
+            }
         }
     }
 
@@ -133,7 +142,7 @@ internal sealed partial class MastodonExtensionPage : ListPage
     {
         if (_items.Count == 0)
         {
-            if (_needsLogin & !ApiConfig.HasUserToken)
+            if (IsHomePage & !ApiConfig.HasUserToken)
             {
                 this.HasMoreItems = false;
                 this._items.Clear();
@@ -167,25 +176,53 @@ internal sealed partial class MastodonExtensionPage : ListPage
     {
         this.IsLoading = true;
         ExtensionHost.LogMessage(new LogMessage() { Message = $"Loading 20 posts, starting with {_items.Count}..." });
-        var postsAsync = FetchExplorePage(20, this._items.Count);
-        postsAsync.ContinueWith((res) =>
-        {
-            var posts = postsAsync.Result;
-            this.AddPosts(posts);
-            ExtensionHost.LogMessage(new LogMessage() { Message = $"... got {posts.Count} new posts" });
 
-            // this.IsLoading = false;
-            this.RaiseItemsChanged(this._items.Count);
-        }).ConfigureAwait(false);
+        // Weird CmdPal issue:
+        // I originally had this be:
+        //
+        // var postsAsync = FetchExplorePage(20, this._items.Count);
+        // postsAsync.ContinueWith((res) =>
+        // {
+        //     var posts = postsAsync.Result;
+        //     ...
+        //     this.RaiseItemsChanged(this._items.Count);
+        // }).ConfigureAwait(false);
+        //
+        // but that weirdly seemed to... hang the CmdPal UI thread if I set a
+        // breakpoint in our FetchExplorePage?
+        _ = Task.Run(LoadMoreAsync);
     }
 
-    public async Task<List<MastodonStatus>> FetchExplorePage() => await FetchExplorePage(20, 0);
+    private async Task LoadMoreAsync()
+    {
+        var posts = await FetchExplorePage(true);
+        this.AddPosts(posts);
+        ExtensionHost.LogMessage(new LogMessage() { Message = $"... got {posts.Count} new posts" });
 
-    public async Task<List<MastodonStatus>> FetchExplorePage(int limit, int offset)
+        // this.IsLoading = false;
+        this.RaiseItemsChanged(this._items.Count);
+    }
+
+    private string PostsUrl(bool loadMore = false)
+    {
+        var limit = 20;
+        return IsExplorePage
+            ? loadMore ?
+                $"{_statusesUrl}?limit={limit}&offset={_items.Count}" :
+                $"{_statusesUrl}?limit={limit}&offset=0"
+            : loadMore ?
+                $"{_statusesUrl}?limit={limit}&max_id={_oldestId}" :
+                $"{_statusesUrl}?limit={limit}";
+    }
+
+    // public async Task<List<MastodonStatus>> FetchExplorePage() => await FetchExplorePage(20, 0);
+
+    // public async Task<List<MastodonStatus>> FetchExplorePage(int limit, int offset)
+    public async Task<List<MastodonStatus>> FetchExplorePage(bool loadMore = false)
     {
         var statuses = new List<MastodonStatus>();
 
-        if (_needsLogin && !ApiConfig.HasUserToken)
+        if (IsHomePage && !ApiConfig.HasUserToken)
         {
             // TODO! ShowMessage & bail
             return statuses;
@@ -194,7 +231,8 @@ internal sealed partial class MastodonExtensionPage : ListPage
         try
         {
             // Make a GET request to the Mastodon trends API endpoint
-            var options = new RestClientOptions($"{_statusesUrl}?limit={limit}&offset={offset}");
+            var url = PostsUrl(loadMore);
+            var options = new RestClientOptions(url);
             var client = new RestClient(options);
             var request = new RestRequest(string.Empty);
             request.AddHeader("accept", "application/json");
