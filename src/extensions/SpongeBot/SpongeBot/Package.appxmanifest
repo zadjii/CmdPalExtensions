@@ -46,7 +46,7 @@
       <Extensions>
         <com:Extension Category="windows.comServer">
           <com:ComServer>
-            <com:ExeServer Executable="SpongeBot.exe" Arguments="-RegisterProcessAsComServer" DisplayName="Spongebot">
+            <com:ExeServer Executable="SpongeBotExtension.exe" Arguments="-RegisterProcessAsComServer" DisplayName="Spongebot">
               <com:Class Id="4e3a46a2-1849-47a5-9c3a-f9a39d15338f" DisplayName="Spongebot" />
             </com:ExeServer>
           </com:ComServer>
