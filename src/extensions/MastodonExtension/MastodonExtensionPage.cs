@@ -69,12 +69,11 @@ internal sealed partial class MastodonExtensionPage : ListPage
 
             var postItem = new ListItem(new MastodonPostPage(p))
             {
-                Title = p.RealAccount.DisplayName, // p.ContentAsPlainText(),
+                Title = p.RealAccount.DisplayName,
                 Subtitle = subtitle,
                 Icon = new IconInfo(p.RealAccount.Avatar),
 
-                // *
-                Tags = tags.ToArray(), // */
+                Tags = tags.ToArray(),
                 Details = new Details()
                 {
                     // It was a cool idea to have a single image as the HeroImage, but the scaling is terrible
@@ -520,8 +519,6 @@ public partial class MastodonLoginForm : FormContent
         {
             var codeString = code.ToString();
             _ = ApiConfig.LoginUser(codeString).ConfigureAwait(false);
-
-            // ApiConfig.UserAuthorizationCode = codeString;
         }
 
         return CommandResult.GoHome();
