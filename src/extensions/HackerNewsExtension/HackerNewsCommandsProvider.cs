@@ -9,15 +9,21 @@ namespace HackerNewsExtension;
 
 public partial class HackerNewsCommandsProvider : CommandProvider
 {
+    private readonly ICommandItem[] _actions;
+
     public HackerNewsCommandsProvider()
     {
         DisplayName = "Hacker News Commands";
         Icon = HackerNewsPage.HackerNewsIcon;
-    }
 
-    private readonly ICommandItem[] _actions = [
-        new CommandItem(new HackerNewsPage()),
-    ];
+        _actions = [
+        new CommandItem(new HackerNewsPage())
+        {
+            Title = "Hacker News",
+            Subtitle = "Search & Browse posts on Hacker News",
+        },
+        ];
+    }
 
     public override ICommandItem[] TopLevelCommands() => _actions;
 }
