@@ -87,8 +87,8 @@ internal sealed partial class ObsidianExtensionPage : ListPage
 
         if (Directory.Exists(vaultPath))
         {
-            // Get all markdown files in the directory and subdirectories
-            var noteFiles = Directory.GetFiles(vaultPath, "*.md", SearchOption.AllDirectories);
+            // Get all markdown files in the directory and subdirectories except .git and .obsidian
+            var noteFiles = GetFiles(vaultPath, d => !d.Contains(".git", StringComparison.OrdinalIgnoreCase) && !d.Contains(".obsidian", StringComparison.OrdinalIgnoreCase), "*.md");
 
             foreach (var noteFile in noteFiles)
             {
@@ -103,6 +103,25 @@ internal sealed partial class ObsidianExtensionPage : ListPage
         }
 
         return notes.OrderByDescending(n => n.LastModified);
+    }
+
+    public static IEnumerable<string> GetFiles(string rootDirectory, Func<string, bool> directoryFilter, string filePattern)
+    {
+        foreach (var matchedFile in Directory.GetFiles(rootDirectory, filePattern, SearchOption.TopDirectoryOnly))
+        {
+            yield return matchedFile;
+        }
+
+        var matchedDirectories = Directory.GetDirectories(rootDirectory, "*.*", SearchOption.TopDirectoryOnly)
+            .Where(directoryFilter);
+
+        foreach (var dir in matchedDirectories)
+        {
+            foreach (var file in GetFiles(dir, directoryFilter, filePattern))
+            {
+                yield return file;
+            }
+        }
     }
 }
 
