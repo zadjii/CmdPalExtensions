@@ -17,13 +17,10 @@ internal sealed partial class HackerNewsPage : ListPage, IDisposable
 {
     private readonly HttpClient _httpClient = new();
     private readonly JsonSerializerOptions _jsonOptions = new() { PropertyNameCaseInsensitive = true };
-
     public static readonly IconInfo HackerNewsIcon = new("https://news.ycombinator.com/favicon.ico");
     private static readonly IconInfo CommentsIcon = new("\uE8F2");
     private static readonly IconInfo PostIcon = new("\uE8A1");
-
     private readonly List<ListItem> _lastPosts = [];
-
     private DateTime _lastFetch = DateTime.MinValue;
 
     public HackerNewsPage()
@@ -38,7 +35,6 @@ internal sealed partial class HackerNewsPage : ListPage, IDisposable
     public override IListItem[] GetItems()
     {
         var delta = DateTime.UtcNow - _lastFetch;
-
         if (_lastPosts.Count == 0 || delta.Minutes > 5)
         {
             var t = FetchItems();
@@ -53,7 +49,6 @@ internal sealed partial class HackerNewsPage : ListPage, IDisposable
     private async Task FetchItems()
     {
         _lastPosts.Clear();
-
         _lastFetch = DateTime.UtcNow;
 
         // Fetch the list of top story IDs from Hacker News
@@ -63,12 +58,10 @@ internal sealed partial class HackerNewsPage : ListPage, IDisposable
         // Deserialize the JSON array into a List of integers (story IDs)
         var topStoryIds = JsonSerializer.Deserialize<List<int>>(topStoriesJson);
         var storiesToFetch = 25;
-
         for (var i = 0; i < Math.Min(storiesToFetch, topStoryIds.Count); i++)
         {
             var storyId = topStoryIds[i];
             var storyUrl = $"https://hacker-news.firebaseio.com/v0/item/{storyId}.json";
-
             try
             {
                 var storyJson = await _httpClient.GetStringAsync(storyUrl);
@@ -76,16 +69,16 @@ internal sealed partial class HackerNewsPage : ListPage, IDisposable
                 // Deserialize the JSON into our Story object.
                 // The option PropertyNameCaseInsensitive = true makes sure that
                 // properties like "descendants" and "score" are properly bound.
-                var story = JsonSerializer.Deserialize<NewsItem>(
-                    storyJson,
-                    _jsonOptions);
-
+                var story = JsonSerializer.Deserialize<NewsItem>(storyJson, _jsonOptions);
                 if (story != null)
                 {
-                    var targetCommand = new OpenUrlCommand(story.Url);
-                    var commentsCommand = new OpenUrlCommand(story.CommentsUrl) { Name = "View comments", Icon = CommentsIcon };
+                    var targetCommand = new OpenUrlCommand(story.Url) { Name = "Open", Result = CommandResult.Dismiss() };
+                    var commentsCommand =
+                        new OpenUrlCommand(story.CommentsUrl) { Name = "View comments", Icon = CommentsIcon, Result = CommandResult.Dismiss() };
+
                     ICommandContextItem[] contextMenu = [];
                     ICommand primary;
+
                     if (story.IsLink)
                     {
                         primary = targetCommand;
@@ -105,19 +98,16 @@ internal sealed partial class HackerNewsPage : ListPage, IDisposable
                         Subtitle = story.TargetLink,
 
                         // Icon = icon,
-                        Tags = [
+                        Tags =
+                        [
                             new Tag($"{story.Score} points"),
-                            new Tag($"{story.Descendants}") { Icon = CommentsIcon },
-                            new Tag($"by {story.By}"),
+                            new Tag($"{story.Descendants}") { Icon = CommentsIcon }, new Tag($"by {story.By}"),
                         ],
                         MoreCommands = contextMenu,
                     };
-
                     _ = Task.Run(async () =>
                     {
-                        var icon = story.IsLink ?
-                            await GetPostIconFromUrl(story.Url)
-                            : CommentsIcon;
+                        var icon = story.IsLink ? await GetPostIconFromUrl(story.Url) : CommentsIcon;
                         item.Icon = icon;
                     });
                     _lastPosts.Add(item);
