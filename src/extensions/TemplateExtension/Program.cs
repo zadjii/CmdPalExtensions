@@ -6,6 +6,7 @@ using System;
 using System.Threading;
 using Microsoft.CommandPalette.Extensions;
 using Shmuelie.WinRTServer;
+using Shmuelie.WinRTServer.CsWinRT;
 
 namespace TemplateExtension;
 
@@ -18,8 +19,8 @@ public class Program
         {
             global::Shmuelie.WinRTServer.ComServer server = new();
             ManualResetEvent extensionDisposedEvent = new(false);
-            TemplateExtension extensionInstance = new(extensionDisposedEvent);
-            server.RegisterClass<TemplateExtension, IExtension>(() => extensionInstance);
+            SampleExtension extensionInstance = new(extensionDisposedEvent);
+            server.RegisterClass<SampleExtension, IExtension>(() => extensionInstance);
             server.Start();
             extensionDisposedEvent.WaitOne();
             server.Stop();

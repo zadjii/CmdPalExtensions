@@ -1,18 +1,11 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
   <Import Project="..\..\Common.Dotnet.CsWinRT.props" />
+  <Import Project="..\..\Common.Extension.props" />
   <PropertyGroup>
     <OutputType>WinExe</OutputType>
     <RootNamespace>MastodonExtension</RootNamespace>
-    <ApplicationManifest>app.manifest</ApplicationManifest>
-    
-    <PublishProfile>win-$(Platform).pubxml</PublishProfile>
-    <UseWinUI>false</UseWinUI>
-    <EnableMsixTooling>true</EnableMsixTooling>
-    <OutputPath>$(SolutionDir)$(Platform)\$(Configuration)\WinUI3Apps\CmdPalExtensions\$(RootNamespace)</OutputPath>
-    <AppendTargetFrameworkToOutputPath>false</AppendTargetFrameworkToOutputPath>
-    <AppendRuntimeIdentifierToOutputPath>false</AppendRuntimeIdentifierToOutputPath>
-    <GenerateAppxPackageOnBuild>true</GenerateAppxPackageOnBuild>
     <UserSecretsId>efe78e2f-9ee6-4e18-a37e-165c62f70a1b</UserSecretsId>
+    <Nullable>disable</Nullable>
   </PropertyGroup>
 
   <ItemGroup>
