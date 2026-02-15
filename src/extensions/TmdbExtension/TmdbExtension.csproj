@@ -1,17 +1,9 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
   <Import Project="..\..\Common.Dotnet.CsWinRT.props" />
+  <Import Project="..\..\Common.Extension.props" />
   <PropertyGroup>
     <OutputType>WinExe</OutputType>
     <RootNamespace>TmdbExtension</RootNamespace>
-    <ApplicationManifest>app.manifest</ApplicationManifest>
-    <PublishProfile>win-$(Platform).pubxml</PublishProfile>
-    <UseWinUI>false</UseWinUI>
-    <EnableMsixTooling>true</EnableMsixTooling>
-    <Nullable>enable</Nullable>
-    <OutputPath>$(SolutionDir)$(Platform)\$(Configuration)\WinUI3Apps\CmdPalExtensions\$(RootNamespace)</OutputPath>
-    <AppendTargetFrameworkToOutputPath>false</AppendTargetFrameworkToOutputPath>
-    <AppendRuntimeIdentifierToOutputPath>false</AppendRuntimeIdentifierToOutputPath>
-    <GenerateAppxPackageOnBuild>true</GenerateAppxPackageOnBuild>
     <UserSecretsId>10b39f2d-fe16-483b-81d8-25221a0e05ab</UserSecretsId>
   </PropertyGroup>
 
@@ -31,12 +23,13 @@
 
 
   <ItemGroup>
-    <!-- <ProjectReference Include="..\..\extensionsdk\Microsoft.CommandPalette.Extensions.Toolkit\Microsoft.CommandPalette.Extensions.Toolkit.csproj" /> -->
     <PackageReference Include="Microsoft.CommandPalette.Extensions" />
-    <PackageReference Include="Microsoft.WindowsAppSDK" />
-    <PackageReference Include="Microsoft.Web.WebView2" /> 
+    <PackageReference Include="Microsoft.Windows.SDK.BuildTools.MSIX">
+      <PrivateAssets>all</PrivateAssets>
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+    </PackageReference>
+    <PackageReference Include="Shmuelie.WinRTServer" />
 
-    <!-- <PackageReference Include="Microsoft.Extensions.Configuration" /> -->
     <PackageReference Include="Microsoft.Extensions.Configuration.UserSecrets" />
     <PackageReference Include="RestSharp" />
   </ItemGroup>

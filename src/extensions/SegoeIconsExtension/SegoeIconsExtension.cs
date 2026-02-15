@@ -12,13 +12,13 @@ namespace SegoeIconsExtension;
 [ComVisible(true)]
 [Guid("b856be07-31c7-46d8-a1a4-72ba58708ea6")]
 [ComDefaultInterface(typeof(IExtension))]
-public sealed partial class SampleExtension : IExtension, IDisposable
+public sealed partial class SegoeIconsExtension : IExtension, IDisposable
 {
     private readonly ManualResetEvent _extensionDisposedEvent;
 
     private readonly SegoeIconsExtensionActionsProvider _provider = new();
 
-    public SampleExtension(ManualResetEvent extensionDisposedEvent)
+    public SegoeIconsExtension(ManualResetEvent extensionDisposedEvent)
     {
         this._extensionDisposedEvent = extensionDisposedEvent;
     }
