@@ -1,11 +1,7 @@
 
 $gitRoot = git rev-parse --show-toplevel
 $gitRoot
-
-# Updated path to search for msix files.
-# They seem to be in 
-# src\extensions\{project}\AppPackages\{package}_0.0.5.0_x64_Test\*.msix
-$winui3Apps = Join-Path $gitRoot "src\extensions"
+$winui3Apps = Join-Path $gitRoot "x64\Release\WinUI3Apps"
 $winui3Apps
 $msixs = Get-ChildItem -Path $winui3Apps -Recurse -File -Filter "*.msix" -exclude "Microsoft.WindowsAppRuntime.1.6.msix"
 
