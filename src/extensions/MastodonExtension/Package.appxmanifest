@@ -10,7 +10,7 @@
 
   <Identity
     Name="MastodonExtension"
-    Publisher="CN=Michael Griese, O=Michael Griese, L=Verona, S=Wisconsin, C=US"
+    Publisher="CN=Michael Griese, O=Michael Griese, L=Madison, S=Wisconsin, C=US"
     Version="0.0.5.0" />
 
   <Properties>

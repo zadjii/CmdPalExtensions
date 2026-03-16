@@ -32,6 +32,26 @@ public partial class ObsidianExtensionActionsProvider : CommandProvider
     }
 
     public override ICommandItem[] TopLevelCommands() => _commands;
+
+    private ICommandItem? GetCommandItemById(string id)
+    {
+        foreach (var cmd in _commands)
+        {
+            if (cmd.Command.Id == id)
+            {
+                return cmd;
+            }
+        }
+
+        return null;
+    }
+
+    public override ICommand? GetCommand(string id)
+    {
+        // Lookup the command by path
+        var commandItem = GetCommandItemById(id);
+        return commandItem?.Command;
+    }
 }
 
 [System.Diagnostics.CodeAnalysis.SuppressMessage("StyleCop.CSharp.MaintainabilityRules", "SA1402:File may only contain a single type", Justification = "Sample code")]
@@ -45,7 +65,7 @@ public class SettingsManager : JsonSettingsManager
         "Input the path to the folder where your Obsidian vault is stored",
         string.Empty);
 
-    public string VaultPath => _vaultPath.Value;
+    public string VaultPath => _vaultPath.Value ?? string.Empty;
 
     internal static string SettingsJsonPath()
     {

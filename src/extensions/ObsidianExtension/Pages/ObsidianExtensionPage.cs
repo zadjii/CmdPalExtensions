@@ -65,13 +65,13 @@ internal sealed partial class ObsidianExtensionPage : ListPage
             var details = n.Details;
 
             // details.Title = n.Name;
-            return new ListItem(previewNote)
+            return new ListItem(openNote)
             {
                 Title = n.Name,
                 Subtitle = $"{n.Folder}/",
                 Icon = previewNote.Icon,
                 MoreCommands = [
-                    new CommandContextItem(openNote) { RequestedShortcut = new(VirtualKeyModifiers.Control, (int)VirtualKey.O, 0) },
+                    new CommandContextItem(previewNote) { RequestedShortcut = new(VirtualKeyModifiers.Control, (int)VirtualKey.P, 0) },
                     new CommandContextItem(new EditNotePage(n)) { RequestedShortcut = new(VirtualKeyModifiers.Control, (int)VirtualKey.E, 0) },
                     new CommandContextItem(new AppendToNotePage(n)) { RequestedShortcut = new(VirtualKeyModifiers.Control, (int)VirtualKey.A, 0) },
                 ],
@@ -122,6 +122,7 @@ public partial class PreviewNotePage : ContentPage
         {
             Name = "Open",
             Result = CommandResult.Dismiss(),
+            Id = note.AbsolutePath,
         };
         Commands = [
             new CommandContextItem(openNote) { RequestedShortcut = new(VirtualKeyModifiers.Control, (int)VirtualKey.O, 0) },
@@ -346,13 +347,13 @@ public sealed class Note(string absolutePath)
 
     public string Name => Path.GetFileNameWithoutExtension(AbsolutePath);
 
-    public string Folder => Path.GetDirectoryName(AbsolutePath[VaultPath.Length..].TrimStart('\\', '/'));
+    public string Folder => Path.GetDirectoryName(AbsolutePath[VaultPath.Length..]?.TrimStart('\\', '/')) ?? string.Empty;
 
     public string RelativePath => Path.GetRelativePath(VaultPath, AbsolutePath);
 
     public string ObsidianProtocolUri => $"obsidian://open?vault={Uri.EscapeDataString(VaultName)}&file={Uri.EscapeDataString(RelativePath)}";
 
-    public event TypedEventHandler<Note, string> ContentChanged;
+    public event TypedEventHandler<Note, string?>? ContentChanged;
 
     public Details Details { get; } = new NoteDetails(absolutePath) { Title = Path.GetFileNameWithoutExtension(absolutePath) };
 
@@ -383,7 +384,7 @@ internal sealed partial class NoteDetails : Details
     private readonly Lazy<string> _fileContents;
     private readonly string _absolutePath;
 
-    private string NoteContent()
+    private string? NoteContent()
     {
         try
         {
@@ -400,6 +401,6 @@ internal sealed partial class NoteDetails : Details
     internal NoteDetails(string absolutePath)
     {
         _absolutePath = absolutePath;
-        _fileContents = new(NoteContent);
+        _fileContents = new(NoteContent() ?? string.Empty);
     }
 }

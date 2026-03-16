@@ -19,8 +19,8 @@ public class Program
         {
             global::Shmuelie.WinRTServer.ComServer server = new();
             ManualResetEvent extensionDisposedEvent = new(false);
-            SampleExtension extensionInstance = new(extensionDisposedEvent);
-            server.RegisterClass<SampleExtension, IExtension>(() => extensionInstance);
+            ObsidianExtension extensionInstance = new(extensionDisposedEvent);
+            server.RegisterClass<ObsidianExtension, IExtension>(() => extensionInstance);
             server.Start();
             extensionDisposedEvent.WaitOne();
             server.Stop();
