@@ -52,6 +52,11 @@ public partial class ObsidianExtensionActionsProvider : CommandProvider
         var commandItem = GetCommandItemById(id);
         return commandItem?.Command;
     }
+
+    public override ICommandItem? GetCommandItem(string id)
+    {
+        return GetCommandItemById(id);
+    }
 }
 
 [System.Diagnostics.CodeAnalysis.SuppressMessage("StyleCop.CSharp.MaintainabilityRules", "SA1402:File may only contain a single type", Justification = "Sample code")]
