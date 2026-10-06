@@ -24,6 +24,7 @@
 
   <ItemGroup>
     <PackageReference Include="HtmlAgilityPack" />
+    <InternalsVisibleTo Include="MastodonExtension.Tests" />
   </ItemGroup>
 
 
