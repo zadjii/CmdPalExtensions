@@ -18,7 +18,7 @@ namespace ObsidianExtension;
 
 internal sealed partial class ObsidianExtensionPage : ListPage
 {
-    public static readonly IconInfo ObsidianIcon = new(Path.Combine(AppDomain.CurrentDomain.BaseDirectory.ToString(), "Assets\\obsidian-logo.png"));
+    public static readonly IconInfo ObsidianIcon = IconHelpers.FromRelativePath("Assets\\obsidian-logo.png");
 
     public ObsidianExtensionPage()
     {

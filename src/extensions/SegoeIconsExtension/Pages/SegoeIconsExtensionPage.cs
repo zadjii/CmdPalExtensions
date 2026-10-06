@@ -21,7 +21,7 @@ internal sealed partial class SegoeIconsExtensionPage : ListPage
 
     public SegoeIconsExtensionPage()
     {
-        Icon = new(Path.Combine(AppDomain.CurrentDomain.BaseDirectory.ToString(), "Assets/WinUI3Gallery.png"));
+        Icon = IconHelpers.FromRelativePath("Assets\\WinUI3Gallery.png");
         Name = "Segoe Icons";
         IsLoading = true;
         PreloadIcons();

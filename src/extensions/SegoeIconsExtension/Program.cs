@@ -28,7 +28,7 @@ public class Program
         }
         else
         {
-            Console.WriteLine("Not being launched as a Extension... exiting.");
+            global::CmdPalExtensions.ExtensionLaunch.ShowHelp("Segoe Icons for Command Palette");
         }
     }
 }

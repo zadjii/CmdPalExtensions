@@ -1,0 +1,93 @@
+{
+  "publisher": "CN=5C876BBB-0FB4-4B0F-A120-BE7215903BDF",
+  "publisherDisplayName": "zadjii.",
+  "apps": [
+    {
+      "id": "hackernews",
+      "project": "src\\extensions\\HackerNewsExtension\\HackerNewsExtension.csproj",
+      "identityName": "zadjii.HackerNewsforCommandPalette",
+      "displayName": "Hacker News for Command Palette",
+      "description": "Browse Hacker News stories and open articles and discussions from Command Palette.",
+      "color": "#C44900",
+      "symbol": "news",
+      "storeId": null
+    },
+    {
+      "id": "obsidian",
+      "project": "src\\extensions\\ObsidianExtension\\ObsidianExtension.csproj",
+      "identityName": "zadjii.ObsidianNotesforCommandPalette",
+      "displayName": "Obsidian Notes for Command Palette",
+      "description": "Find, preview, edit, and open notes in your local Obsidian vault from Command Palette.",
+      "iconSource": "Assets\\obsidian-logo.png",
+      "storeId": null
+    },
+    {
+      "id": "mastodon",
+      "project": "src\\extensions\\MastodonExtension\\MastodonExtension.csproj",
+      "identityName": "zadjii.MastodonforCommandPalette",
+      "displayName": "Mastodon for Command Palette",
+      "description": "Browse mastodon.social timelines and interact with posts from Command Palette.",
+      "color": "#4654B8",
+      "symbol": "chat",
+      "storeId": null
+    },
+    {
+      "id": "tmdb",
+      "project": "src\\extensions\\TmdbExtension\\TmdbExtension.csproj",
+      "identityName": "zadjii.TMDBSearchforCommandPalette",
+      "displayName": "TMDB Search for Command Palette",
+      "description": "Search movies, inspect details, and find streaming providers using your TMDB API token.",
+      "iconSource": "Assets\\Tmdb-312x276-logo.png",
+      "storeId": null
+    },
+    {
+      "id": "icons",
+      "project": "src\\extensions\\SegoeIconsExtension\\SegoeIconsExtension.csproj",
+      "identityName": "zadjii.SegoeIconsforCommandPalette",
+      "displayName": "Segoe Icons for Command Palette",
+      "description": "Browse and copy Segoe Fluent icon characters from Command Palette.",
+      "iconSource": "Assets\\WinUI3Gallery.png",
+      "storeId": null
+    },
+    {
+      "id": "favorites",
+      "project": "src\\extensions\\EdgeFavoritesExtension\\EdgeFavoritesExtension.csproj",
+      "identityName": "zadjii.EdgeFavoritesforCommandPalette",
+      "displayName": "Edge Favorites for Command Palette",
+      "description": "Search locally stored Microsoft Edge favorites and open them from Command Palette.",
+      "color": "#087E8B",
+      "symbol": "bookmark",
+      "storeId": null
+    },
+    {
+      "id": "nfl",
+      "project": "src\\extensions\\NflExtension\\NflExtension.csproj",
+      "identityName": "zadjii.NFLScoresforCommandPalette",
+      "displayName": "NFL Scores for Command Palette",
+      "description": "View professional football scores and game details from ESPN in Command Palette.",
+      "color": "#8C4931",
+      "symbol": "football",
+      "storeId": null
+    },
+    {
+      "id": "sponge",
+      "project": "src\\extensions\\SpongeBot\\SpongeBot\\SpongeBotExtension.csproj",
+      "identityName": "zadjii.SpongeBotforCommandPalette",
+      "displayName": "SpongeBot for Command Palette",
+      "description": "Convert text to alternating upper and lower case and copy it from Command Palette.",
+      "color": "#8E6500",
+      "symbol": "text",
+      "storeId": null
+    },
+    {
+      "id": "media",
+      "project": "src\\extensions\\MediaControlsExtension\\MediaControlsExtension.csproj",
+      "identityName": "zadjii.MediaControlsforCommandPalette",
+      "displayName": "Media Controls for Command Palette",
+      "description": "Control playback and view track details from Windows media sessions in Command Palette.",
+      "color": "#A12D70",
+      "symbol": "play",
+      "storeId": null
+    }
+  ]
+}

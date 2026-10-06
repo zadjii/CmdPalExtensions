@@ -120,7 +120,7 @@ internal sealed partial class HackerNewsPage : ListPage, IDisposable
         }
     }
 
-    public void Dispose() => throw new NotImplementedException();
+    public void Dispose() => _httpClient.Dispose();
 
     internal static Uri GetUri(string url)
     {

@@ -146,13 +146,6 @@ internal sealed partial class NflExtensionPage : ListPage, IDisposable
             Icon = icon,
             Tags = tags,
             Details = details,
-            MoreCommands = [
-                new CommandContextItem(new OpenUrlCommand("https://reddit1.nflbite.com/"))
-                {
-                    Title = "Go to NFLbite",
-                    Icon = new IconInfo("https://reddit1.nflbite.com/icon.png"),
-                }
-            ],
         };
 
         static IDetails BuildDetails(Competition game)

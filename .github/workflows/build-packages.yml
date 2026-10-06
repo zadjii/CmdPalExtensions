@@ -1,0 +1,80 @@
+name: Build Store bundles
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+    tags: ['**']
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: Build ${{ matrix.platform }} packages
+    runs-on: windows-2022
+    strategy:
+      fail-fast: false
+      matrix:
+        platform: [x64, ARM64]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '9.0.x'
+      - name: Validate Store preparation
+        shell: pwsh
+        run: |
+          .\src\tools\tests\StoreReadiness.Tests.ps1
+          .\src\tools\tests\MediaControls.Tests.ps1
+      - name: Build unsigned packages for each Store app
+        shell: pwsh
+        env:
+          PLATFORM: ${{ matrix.platform }}
+        run: .\src\tools\Build-StorePackages.ps1 -Platform $env:PLATFORM
+      - uses: actions/upload-artifact@v4
+        with:
+          name: msix-${{ matrix.platform }}
+          path: |
+            artifacts\packages\${{ matrix.platform }}\**\*.msix
+            !artifacts\packages\${{ matrix.platform }}\**\Dependencies\**
+          if-no-files-found: error
+
+  bundle:
+    name: Prepare per-extension Store bundles
+    needs: build
+    runs-on: windows-2022
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: msix-*
+          path: artifacts\packages
+      - name: Test bundling
+        shell: pwsh
+        run: .\src\tools\tests\MsixPackaging.Tests.ps1
+      - name: Create and inspect all Store bundles
+        shell: pwsh
+        run: |
+          .\src\tools\New-MsixBundles.ps1
+          .\src\tools\Test-StoreReadiness.ps1 -BundlesPath .\artifacts\bundles
+          .\src\tools\tests\StoreReadiness.Tests.ps1 -BundlesPath .\artifacts\bundles
+      - name: Upload separate application bundles
+        uses: actions/upload-artifact@v4
+        with:
+          name: store-msixbundles
+          path: artifacts\bundles\*.msixbundle
+          if-no-files-found: error
+      - name: Upload submission materials
+        uses: actions/upload-artifact@v4
+        with:
+          name: store-submission-materials
+          path: |
+            doc\store
+            doc\licenses
+            src\store-apps.json
+            LICENSE
+            PRIVACY.md
+            THIRD-PARTY-NOTICES.md
+          if-no-files-found: error

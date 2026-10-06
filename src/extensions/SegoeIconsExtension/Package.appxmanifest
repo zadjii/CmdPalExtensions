@@ -9,19 +9,18 @@
   IgnorableNamespaces="uap uap3 rescap">
 
   <Identity
-    Name="SegoeIconsExtension"
-    Publisher="CN=Michael Griese, O=Michael Griese, L=Verona, S=Wisconsin, C=US"
-    Version="0.0.3.0" />
+    Name="zadjii.SegoeIconsforCommandPalette"
+    Publisher="CN=5C876BBB-0FB4-4B0F-A120-BE7215903BDF"
+    Version="0.1.0.0" />
 
   <Properties>
-    <DisplayName>Segoe Icons</DisplayName>
-    <PublisherDisplayName>zadjii</PublisherDisplayName>
-    <Logo>Assets\StoreLogo.png</Logo>
+    <DisplayName>Segoe Icons for Command Palette</DisplayName>
+    <PublisherDisplayName>zadjii.</PublisherDisplayName>
+    <Logo>Assets\Package\StoreLogo.png</Logo>
   </Properties>
 
   <Dependencies>
-    <TargetDeviceFamily Name="Windows.Universal" MinVersion="10.0.17763.0" MaxVersionTested="10.0.19041.0" />
-    <TargetDeviceFamily Name="Windows.Desktop" MinVersion="10.0.17763.0" MaxVersionTested="10.0.19041.0" />
+    <TargetDeviceFamily Name="Windows.Desktop" MinVersion="10.0.19041.0" MaxVersionTested="10.0.19041.0" />
   </Dependencies>
 
   <Resources>
@@ -33,19 +32,19 @@
       Executable="$targetnametoken$.exe"
       EntryPoint="$targetentrypoint$">
       <uap:VisualElements
-        DisplayName="Segoe Icons"
-        Description="Segoe Icons"
+        DisplayName="Segoe Icons for Command Palette"
+        Description="Browse and copy Segoe Fluent icon characters from Command Palette."
         BackgroundColor="transparent"
-        Square150x150Logo="Assets\Square150x150Logo.png"
-        Square44x44Logo="Assets\Square44x44Logo.png">
-        <uap:DefaultTile Wide310x150Logo="Assets\Wide310x150Logo.png" />
-        <uap:SplashScreen Image="Assets\SplashScreen.png" />
+        Square150x150Logo="Assets\Package\Square150x150Logo.png"
+        Square44x44Logo="Assets\Package\Square44x44Logo.png">
+        <uap:DefaultTile Wide310x150Logo="Assets\Package\Wide310x150Logo.png" />
+        <uap:SplashScreen Image="Assets\Package\SplashScreen.png" />
       </uap:VisualElements>
       <Extensions>
         <com:Extension Category="windows.comServer">
           <com:ComServer>
-            <com:ExeServer Executable="SegoeIconsExtension.exe" Arguments="-RegisterProcessAsComServer" DisplayName="Segoe Icons">
-              <com:Class Id="b856be07-31c7-46d8-a1a4-72ba58708ea6" DisplayName="Segoe Icons" />
+            <com:ExeServer Executable="SegoeIconsExtension.exe" Arguments="-RegisterProcessAsComServer" DisplayName="Segoe Icons for Command Palette">
+              <com:Class Id="b856be07-31c7-46d8-a1a4-72ba58708ea6" DisplayName="Segoe Icons for Command Palette" />
             </com:ExeServer>
           </com:ComServer>
         </com:Extension>
@@ -53,8 +52,8 @@
           <uap3:AppExtension Name="com.microsoft.commandpalette"
             Id="PG-SP-ID"
             PublicFolder="Public"
-            DisplayName="Segoe Icons"
-            Description="Segoe Icons">
+            DisplayName="Segoe Icons for Command Palette"
+            Description="Browse and copy Segoe Fluent icon characters from Command Palette.">
             <uap3:Properties>
               <CmdPalProvider>
                 <Activation>

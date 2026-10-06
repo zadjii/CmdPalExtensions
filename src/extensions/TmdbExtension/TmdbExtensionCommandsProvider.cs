@@ -22,21 +22,23 @@ public partial class TmdbExtensionActionsProvider : CommandProvider
     public TmdbExtensionActionsProvider()
     {
         DisplayName = "TMDB Search Commands";
-        Icon = new(Path.Combine(AppDomain.CurrentDomain.BaseDirectory.ToString(), "Assets\\Tmdb-312x276-logo.png"));
+        Icon = IconHelpers.FromRelativePath("Assets\\Tmdb-312x276-logo.png");
 
         _logoutItem = new CommandContextItem(new LogoutCommand())
         {
             Title = "Logout of TMDB",
         };
+        var aboutItem = new CommandContextItem(new TmdbAboutPage());
 
         _searchMoviesItem = new CommandItem(new TmdbExtensionPage())
         {
             Title = "Search movies on TMDB",
-            MoreCommands = [_logoutItem],
+            MoreCommands = [_logoutItem, aboutItem],
         };
         _loginItem = new CommandItem(new TmdbLoginPage())
         {
             Title = "Login to search TMDB for movies",
+            MoreCommands = [aboutItem],
         };
 
         ApiConfig.UserTokenChanged += (s, e) => RaiseItemsChanged(1);
