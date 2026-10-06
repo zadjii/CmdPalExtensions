@@ -66,6 +66,34 @@ These are open for community contributions. I definitely don't have the time to 
 </tbody>
 </table>
 
+## TMDB Search setup
+
+Sign in to [TMDB's API settings](https://www.themoviedb.org/settings/api) and
+copy your **API Read Access Token** into the extension's login form. Use the
+read access token, not your TMDB password or API key. Signing in to the TMDB
+website alone does not authenticate the extension. The token is stored in
+Windows Credential Manager. Use **Update TMDB API token** in the search command's
+context menu to replace it.
+
+Open the extension's settings from Command Palette settings or the command's
+context menu to set **Language**. Both movie searches and movie details use this
+language code (for example, `fr`, `it`, or `en-US`). The default is `en-US`;
+leaving the setting blank also uses `en-US`. This changes the language of
+returned titles, descriptions, and genres, not the movies' original language
+or the streaming-provider region (currently US).
+
+Authentication, network, and API errors are shown separately from an empty
+search result. If authentication fails, open the error item to enter your
+API Read Access Token again.
+
 ## Contributing
 
 Want to help contribute an extension! Go for it! I'll pretty much accept PRs for anything at this point. 
+
+Run the TMDB regression tests on Windows with the .NET 9 SDK or later:
+
+```powershell
+dotnet test .\src\extensions\TmdbExtension.Tests\TmdbExtension.Tests.csproj -p:Platform=x64
+```
+
+These tests use simulated HTTP responses; no TMDB account or API token is required.

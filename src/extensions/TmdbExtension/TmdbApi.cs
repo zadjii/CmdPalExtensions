@@ -14,6 +14,7 @@ public sealed class MovieSearchResponse
     [JsonPropertyName("page")]
     public int Page { get; set; }
 
+    [JsonRequired]
     [JsonPropertyName("results")]
     public MovieSearchResult[] Results { get; set; } = [];
 }
@@ -52,7 +53,7 @@ public sealed class MovieSearchResult
     public string Release_date { get; set; } = string.Empty;
 
     [JsonIgnore]
-    public string ReleaseYear => Release_date.Split('-')[0];
+    public string ReleaseYear => Release_date?.Split('-')[0] ?? string.Empty;
 
     [JsonPropertyName("title")]
     public string Title { get; set; } = string.Empty;
