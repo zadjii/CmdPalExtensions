@@ -36,7 +36,7 @@ These are open for community contributions. I definitely don't have the time to 
 
 [v0.0.4](https://github.com/zadjii/CmdPalExtensions/releases/download/mastodon%2Fv0.0.4/MastodonExtension_0.0.4.0_x64.msix)
     </td>
-    <td>View posts on mastodon.social. You should be able to sign in and view your home timeline & favorite posts too. I haven't tested other servers yet (_I know, I'm a bad fediverse citizen_)
+    <td>Explore posts on your Mastodon instance, sign in to view your home timeline, and favorite or boost posts. Choose your home instance in the extension settings (defaults to mastodon.social).
 </td>
   </tr>
   <tr>
@@ -65,6 +65,22 @@ These are open for community contributions. I definitely don't have the time to 
   </tr>
 </tbody>
 </table>
+
+### Mastodon home instance
+
+Open the Mastodon extension's settings in Command Palette (also available from
+the login, explore, and home commands) and set **Home instance** to your server's
+hostname or HTTPS URL, such as `fosstodon.org` or `https://fosstodon.org`.
+Use the server's base URL, without a path or query.
+
+Login, Explore, your home timeline, replies, favorites, and boosts all use the
+selected instance. Changing instances refreshes the timelines and switches to
+that instance's saved login, or asks you to sign in if you have not used it before.
+Credentials are stored separately for each instance; existing mastodon.social
+logins continue to work. Logging out only removes the selected instance's login.
+
+Run the Mastodon instance regression tests with
+`dotnet test .\src\extensions\MastodonExtension.Tests\MastodonExtension.Tests.csproj -p:Platform=x64`.
 
 ## Contributing
 
