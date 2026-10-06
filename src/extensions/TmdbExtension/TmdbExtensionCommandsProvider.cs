@@ -18,42 +18,57 @@ public partial class TmdbExtensionActionsProvider : CommandProvider
     private readonly CommandContextItem _logoutItem;
     private readonly CommandItem _loginItem;
     private readonly CommandItem _searchMoviesItem;
+    private readonly TmdbExtensionPage _searchPage = new();
 
     public TmdbExtensionActionsProvider()
     {
         DisplayName = "TMDB Search Commands";
         Icon = new(Path.Combine(AppDomain.CurrentDomain.BaseDirectory.ToString(), "Assets\\Tmdb-312x276-logo.png"));
+        Settings = SettingsManager.Instance.Settings;
 
         _logoutItem = new CommandContextItem(new LogoutCommand())
         {
             Title = "Logout of TMDB",
         };
 
-        _searchMoviesItem = new CommandItem(new TmdbExtensionPage())
+        var loginPage = new TmdbLoginPage();
+        var settingsItem = new CommandContextItem(Settings.SettingsPage);
+        _searchMoviesItem = new CommandItem(_searchPage)
         {
             Title = "Search movies on TMDB",
-            MoreCommands = [_logoutItem],
+            MoreCommands = [
+                new CommandContextItem(loginPage) { Title = "Update TMDB API token" },
+                _logoutItem,
+                settingsItem,
+            ],
         };
-        _loginItem = new CommandItem(new TmdbLoginPage())
+        _loginItem = new CommandItem(loginPage)
         {
             Title = "Login to search TMDB for movies",
+            MoreCommands = [settingsItem],
         };
 
-        ApiConfig.UserTokenChanged += (s, e) => RaiseItemsChanged(1);
+        ApiConfig.UserTokenChanged += OnUserTokenChanged;
+        SettingsManager.Instance.Settings.SettingsChanged += RefreshSearch;
     }
 
-    public override ICommandItem[] TopLevelCommands()
+    public override ICommandItem[] TopLevelCommands() => ApiConfig.HasUserToken ? [_searchMoviesItem] : [_loginItem];
+
+    private void OnUserTokenChanged(object? sender, string? token)
     {
-        if (ApiConfig.HasUserToken)
-        {
-            // asdf
-            return [_searchMoviesItem];
-        }
-        else
-        {
-            // qwer
-            return [_loginItem];
-        }
+        _searchPage.Refresh();
+        RaiseItemsChanged(1);
+    }
+
+    private void RefreshSearch(object? sender, object? args) => _searchPage.Refresh();
+
+    public override void Dispose()
+    {
+        ApiConfig.UserTokenChanged -= OnUserTokenChanged;
+        SettingsManager.Instance.Settings.SettingsChanged -= RefreshSearch;
+        _searchPage.Dispose();
+        base.Dispose();
+        GC.SuppressFinalize(this);
     }
 }
 
@@ -66,31 +81,35 @@ public partial class ApiConfig
 
     public static string UserBearerToken { get; private set; } = string.Empty;
 
-    public static bool HasUserToken => !string.IsNullOrEmpty(UserBearerToken);
+    public static bool HasUserToken => !string.IsNullOrWhiteSpace(UserBearerToken);
 
     public static event EventHandler<string?>? UserTokenChanged;
 
     static ApiConfig()
     {
-        var vault = new PasswordVault();
         try
         {
+            var vault = new PasswordVault();
             var savedBearerToken = vault.Retrieve(PasswordVaultResourceName, PasswordVaultBearerToken);
-            if (savedBearerToken != null)
-            {
-                UserBearerToken = savedBearerToken.Password;
-            }
+            savedBearerToken.RetrievePassword();
+            UserBearerToken = savedBearerToken.Password.Trim();
         }
-        catch (Exception)
+        catch (Exception exception) when (exception.HResult == unchecked((int)0x80070490))
         {
-            // log?
+            // There is no saved credential on first use.
+        }
+        catch (Exception exception)
+        {
+            ExtensionHost.LogMessage($"Unable to read the saved TMDB token: HRESULT {exception.HResult:X8}.");
         }
     }
 
     public static void LoginUser(string token)
     {
-        ApiConfig.UserBearerToken = token;
+        ArgumentException.ThrowIfNullOrWhiteSpace(token);
+        token = token.Trim();
         AddToVault(PasswordVaultBearerToken, token);
+        ApiConfig.UserBearerToken = token;
         UserTokenChanged?.Invoke(null, token);
     }
 
@@ -170,13 +189,22 @@ public partial class TmdbLoginForm : FormContent
     public override ICommandResult SubmitForm(string inputs)
     {
         var formInput = JsonNode.Parse(inputs)?.AsObject();
-        if (formInput?.TryGetPropertyValue("Token", out var code) ?? false)
+        var token = formInput?["Token"]?.ToString().Trim();
+        if (string.IsNullOrWhiteSpace(token))
         {
-            if (code != null)
-            {
-                var codeString = code.ToString();
-                ApiConfig.LoginUser(codeString);
-            }
+            new ToastStatusMessage("Enter your TMDB API Read Access Token.").Show();
+            return CommandResult.KeepOpen();
+        }
+
+        try
+        {
+            ApiConfig.LoginUser(token);
+        }
+        catch (Exception exception)
+        {
+            ExtensionHost.LogMessage($"Unable to save the TMDB token: HRESULT {exception.HResult:X8}.");
+            new ToastStatusMessage("Unable to save your TMDB token in Windows Credential Manager.").Show();
+            return CommandResult.KeepOpen();
         }
 
         return CommandResult.GoHome();
@@ -202,7 +230,8 @@ public partial class TmdbLoginForm : FormContent
             "label": "API Token",
             "isRequired": true,
             "errorMessage": "API Token is required",
-            "text": "Login on tmdb.com, and paste your \"API Read Access Token\" here"
+            "text": "Sign in at themoviedb.org and copy the \"API Read Access Token\" from your API settings. Paste the token here, not your account password or API key. Signing in to the website alone does not sign in to this extension.",
+            "wrap": true
         },
         {
             "type": "Input.Text",
