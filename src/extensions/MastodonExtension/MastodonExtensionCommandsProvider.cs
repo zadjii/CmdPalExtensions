@@ -20,33 +20,38 @@ public partial class MastodonExtensionCommandsProvider : CommandProvider
     {
         DisplayName = "Mastodon for CmdPal";
         Icon = MastodonExtensionPage.MastodonIcon;
+        Settings = SettingsManager.Instance.Settings;
 
-        _loginItem = new CommandItem(new MastodonLoginPage());
+        _loginItem = new CommandItem(new MastodonLoginPage())
+        {
+            MoreCommands = [new CommandContextItem(Settings.SettingsPage)],
+        };
         _exploreItem = new CommandItem(new MastodonExtensionPage(isExplorePage: true))
         {
             Title = "Explore Mastodon",
-            Subtitle = "Explore top posts on mastodon.social",
+            Subtitle = $"Explore top posts on {ApiConfig.Instance.Url}",
+            MoreCommands = [new CommandContextItem(Settings.SettingsPage)],
         };
         _homeItem = new CommandItem(new MastodonExtensionPage(isExplorePage: false))
         {
             Title = "Mastodon",
             Subtitle = "Posts from users and tags you follow on Mastodon",
+            MoreCommands = [new CommandContextItem(Settings.SettingsPage)],
         };
         _logoutItem = new CommandItem(new LogoutCommand())
         {
             Subtitle = "Log out of Mastodon",
         };
 
-        ApiConfig.UserLoginChanged += (s, e) => RaiseItemsChanged(1);
+        ApiConfig.UserLoginChanged += (s, e) =>
+        {
+            _exploreItem.Subtitle = $"Explore top posts on {ApiConfig.Instance.Url}";
+            RaiseItemsChanged(1);
+        };
     }
 
     public override ICommandItem[] TopLevelCommands()
     {
-        if (!ApiConfig.HasAppId)
-        {
-            ApiConfig.GetClientIdAndSecret().ConfigureAwait(false);
-        }
-
         if (ApiConfig.HasUserToken)
         {
             return [_homeItem, _exploreItem, _logoutItem];

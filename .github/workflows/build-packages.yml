@@ -28,6 +28,16 @@ jobs:
         run: |
           .\src\tools\tests\StoreReadiness.Tests.ps1
           .\src\tools\tests\MediaControls.Tests.ps1
+      - name: Test Mastodon and TMDB integration
+        if: matrix.platform == 'x64'
+        shell: pwsh
+        run: |
+          foreach ($app in 'Mastodon', 'Tmdb') {
+            dotnet test ".\src\extensions\${app}Extension.Tests\${app}Extension.Tests.csproj" `
+              -p:Platform=x64 "-p:RestoreConfigFile=$PWD\.github\nuget.config" `
+              -p:PublishProfile= -p:AppxPackageSigningEnabled=false --verbosity quiet
+            if ($LASTEXITCODE -ne 0) { throw "$app regression tests failed." }
+          }
       - name: Build unsigned packages for each Store app
         shell: pwsh
         env:

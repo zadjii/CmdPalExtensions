@@ -5,10 +5,10 @@
 
 ## Description
 
-Browse mastodon.social from PowerToys Command Palette. View public posts, or
-authorize your mastodon.social account to access your home timeline and interact
-with posts. Requires PowerToys Command Palette and internet access. This version
-does not support choosing arbitrary Mastodon instances. This is an independent
+Browse your chosen Mastodon instance from PowerToys Command Palette. View public
+posts, or authorize your account to access your home timeline and interact with
+posts. Set Home instance in the extension settings; it defaults to mastodon.social.
+Requires PowerToys Command Palette and internet access. This is an independent
 community client, not an official Mastodon app.
 
 ## Features and keywords
@@ -25,8 +25,9 @@ credentials are in Windows Credential Locker. `runFullTrust` supports desktop
 COM activation and credential access. Disclose internet/user-generated content
 in ratings and review Mastodon's client/branding terms.
 
-Test public access, first authorization, denied authorization, home timeline,
+Test instance selection and validation, separate saved logins when switching
+instances, public access, first authorization, denied authorization, home timeline,
 reply/favorite/boost with a consenting test account, expired/revoked tokens,
-logout, offline behavior, and direct-launch help on both architectures. Supply
+selected-instance logout, offline behavior, and direct-launch help on both architectures. Supply
 reviewer account access securely if certification requests it, never in this
 repository or public screenshots.

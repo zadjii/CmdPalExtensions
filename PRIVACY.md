@@ -42,23 +42,29 @@ operate independently.
 
 ## Mastodon
 
-This version uses **mastodon.social**, not arbitrary instances. It downloads
-timelines, posts, profiles, avatars, and attached media; images may be hosted by
-other instances or content hosts. Signing in registers an OAuth application with
-mastodon.social and authorizes account access with `read write push` scopes.
-The application credentials and your access token are stored in Windows
-Credential Locker (`PasswordVault`, resource `MastodonExtensionKeys`).
+You choose your home instance in the extension's local JSON settings; the
+default is **mastodon.social**. The selected instance receives requests for
+timelines, posts, profiles, and account actions. Avatars and attached media may
+be hosted by other instances or content hosts. Signing in registers an OAuth
+application with your selected instance and authorizes account access with
+`read write push` scopes. The application credentials and your access token are
+stored separately per instance in Windows Credential Locker (`PasswordVault`;
+the default instance retains the legacy `MastodonExtensionKeys` resource).
 Replies, favorites, and boosts are sent to the service when you request them.
-Signing out removes the user token; application registration credentials may
-remain. You can also revoke authorization in your Mastodon account settings.
-The instance's [privacy policy](https://mastodon.social/privacy-policy) applies.
+Changing instances switches to that instance's saved login if available.
+Signing out removes only the selected instance's user token; application
+registration credentials and other instances' logins may remain. You can also
+revoke authorization in each Mastodon account's settings. Your chosen instance's
+privacy policy applies; see [mastodon.social's policy](https://mastodon.social/privacy-policy)
+when using the default instance.
 
 ## TMDB Search
 
 You supply a TMDB API Read Access Token. It is stored in Windows Credential
 Locker (`TmdbExtensionKeys`, `BearerToken`) and sent to `api.themoviedb.org` to
 authorize requests. Search queries and requested movie identifiers are sent to
-TMDB. Posters and provider logos can be downloaded from `image.tmdb.org`, and
+TMDB. Your configured result language is stored in local JSON settings and sent
+with movie searches and detail requests. Posters and provider logos can be downloaded from `image.tmdb.org`, and
 TMDB/JustWatch links or icons can contact their hosts. Links open in your browser.
 You can revoke the token in your TMDB account; clearing the credential separately
 may be necessary. See [TMDB's privacy policy](https://www.themoviedb.org/privacy-policy)

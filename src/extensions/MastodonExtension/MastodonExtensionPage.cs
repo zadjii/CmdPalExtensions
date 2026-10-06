@@ -7,6 +7,7 @@ using System.Collections.Generic;
 using System.Globalization;
 using System.Linq;
 using System.Net.Http;
+using System.Runtime.InteropServices;
 using System.Text.Json;
 using System.Text.Json.Nodes;
 using System.Threading.Tasks;
@@ -20,16 +21,14 @@ namespace MastodonExtension;
 [System.Diagnostics.CodeAnalysis.SuppressMessage("StyleCop.CSharp.MaintainabilityRules", "SA1402:File may only contain a single type", Justification = "This is sample code")]
 internal sealed partial class MastodonExtensionPage : ListPage
 {
-    public static readonly string ExploreUrl = "https://mastodon.social/api/v1/trends/statuses";
-    public static readonly string HomeUrl = "https://mastodon.social/api/v1/timelines/home";
     public static readonly IconInfo MastodonIcon = new("https://mastodon.social/packs/media/icons/android-chrome-36x36-4c61fdb42936428af85afdbf8c6a45a8.png");
 
-    internal static readonly HttpClient Client = new();
     internal static readonly JsonSerializerOptions Options = new() { PropertyNameCaseInsensitive = true };
 
     private readonly List<ListItem> _items = [];
+    private readonly StatusMessage _errorStatus = new() { State = MessageState.Error };
 
-    private readonly string _statusesUrl = string.Empty;
+    private int _version;
 
     private bool IsHomePage { get; }
 
@@ -39,7 +38,6 @@ internal sealed partial class MastodonExtensionPage : ListPage
 
     public MastodonExtensionPage(bool isExplorePage = true)
     {
-        _statusesUrl = isExplorePage ? ExploreUrl : HomeUrl;
         IsHomePage = !isExplorePage;
 
         Icon = MastodonIcon;
@@ -51,23 +49,38 @@ internal sealed partial class MastodonExtensionPage : ListPage
 
         // #6364ff
         AccentColor = ColorHelpers.FromRgb(99, 100, 255);
+
+        ApiConfig.UserLoginChanged += (s, e) =>
+        {
+            lock (_items)
+            {
+                _version++;
+                _items.Clear();
+                _oldestId = long.MaxValue;
+                HasMoreItems = true;
+                IsLoading = true;
+            }
+
+            ExtensionHost.HideStatus(_errorStatus);
+            RaiseItemsChanged(0);
+        };
     }
 
-    private void AddPosts(List<MastodonStatus> posts)
+    private void AddPosts(List<MastodonStatus> posts, MastodonInstance instance)
     {
         foreach (var p in posts)
         {
             var tags = GetTagsForPost(p);
-            var favoritePostCommand = new FavoritePostCommand(p);
+            var favoritePostCommand = new FavoritePostCommand(p, instance);
             var favPostItem = new CommandContextItem(favoritePostCommand);
-            var boostPostCommand = new BoostPostCommand(p);
+            var boostPostCommand = new BoostPostCommand(p, instance);
             var boostPostItem = new CommandContextItem(boostPostCommand);
 
             var subtitle = p.IsBoost ?
                 $"{p.Account.DisplayName} boosted @{p.RealAccount.Username}" :
                 $"@{p.Account.Username}";
 
-            var postItem = new ListItem(new MastodonPostPage(p))
+            var postItem = new ListItem(new MastodonPostPage(p, instance))
             {
                 Title = p.RealAccount.DisplayName,
                 Subtitle = subtitle,
@@ -139,41 +152,55 @@ internal sealed partial class MastodonExtensionPage : ListPage
 
     public override IListItem[] GetItems()
     {
-        if (_items.Count == 0)
+        int version;
+        lock (_items)
         {
-            if (IsHomePage & !ApiConfig.HasUserToken)
+            if (_items.Count > 0)
             {
-                this.HasMoreItems = false;
-                this._items.Clear();
-                var loginPage = new MastodonLoginPage();
-                var item = new ListItem(loginPage)
+                return _items.ToArray();
+            }
+
+            version = _version;
+        }
+
+        if (IsHomePage && !ApiConfig.HasUserToken)
+        {
+            HasMoreItems = false;
+            IsLoading = false;
+            return [
+                new ListItem(new MastodonLoginPage())
                 {
                     Title = "Login to Mastodon",
                     Subtitle = "You need to login before you can view your home timeline",
-                };
-
-                return [item];
-            }
-            else
-            {
-                this.HasMoreItems = true;
-            }
-
-            var postsAsync = FetchExplorePage();
-            postsAsync.ConfigureAwait(false);
-            var posts = postsAsync.Result;
-            this.AddPosts(posts);
+                },
+            ];
         }
 
-        IsLoading = false;
-        return _items
-            .ToArray();
+        var instance = ApiConfig.Instance;
+        var posts = FetchExplorePage(instance, version).GetAwaiter().GetResult();
+        lock (_items)
+        {
+            if (version == _version)
+            {
+                AddPosts(posts, instance);
+                HasMoreItems = posts.Count > 0;
+                IsLoading = false;
+            }
+
+            return _items.ToArray();
+        }
     }
 
     public override void LoadMore()
     {
-        this.IsLoading = true;
-        ExtensionHost.LogMessage(new LogMessage() { Message = $"Loading 20 posts, starting with {_items.Count}..." });
+        int version;
+        MastodonInstance instance;
+        lock (_items)
+        {
+            version = _version;
+            instance = ApiConfig.Instance;
+            IsLoading = true;
+        }
 
         // Weird CmdPal issue:
         // I originally had this be:
@@ -188,31 +215,53 @@ internal sealed partial class MastodonExtensionPage : ListPage
         //
         // but that weirdly seemed to... hang the CmdPal UI thread if I set a
         // breakpoint in our FetchExplorePage?
-        _ = Task.Run(LoadMoreAsync);
+        _ = Task.Run(() => LoadMoreAsync(instance, version));
     }
 
-    private async Task LoadMoreAsync()
+    private async Task LoadMoreAsync(MastodonInstance instance, int version)
     {
-        var posts = await FetchExplorePage(true);
-        this.AddPosts(posts);
+        lock (_items)
+        {
+            if (version != _version)
+            {
+                return;
+            }
+        }
+
+        var posts = await FetchExplorePage(instance, version, true).ConfigureAwait(false);
+        int count;
+        lock (_items)
+        {
+            if (version != _version)
+            {
+                return;
+            }
+
+            AddPosts(posts, instance);
+            HasMoreItems = posts.Count > 0;
+            IsLoading = false;
+            count = _items.Count;
+        }
+
         ExtensionHost.LogMessage(new LogMessage() { Message = $"... got {posts.Count} new posts" });
 
-        this.RaiseItemsChanged(this._items.Count);
+        RaiseItemsChanged(count);
     }
 
-    private string PostsUrl(bool loadMore = false)
+    private string PostsUrl(MastodonInstance instance, bool loadMore = false)
     {
         var limit = 20;
+        var statusesUrl = instance.ApiUrl(IsExplorePage ? "api/v1/trends/statuses" : "api/v1/timelines/home");
         return IsExplorePage
             ? loadMore ?
-                $"{_statusesUrl}?limit={limit}&offset={_items.Count}" :
-                $"{_statusesUrl}?limit={limit}&offset=0"
+                $"{statusesUrl}?limit={limit}&offset={_items.Count}" :
+                $"{statusesUrl}?limit={limit}&offset=0"
             : loadMore ?
-                $"{_statusesUrl}?limit={limit}&max_id={_oldestId}" :
-                $"{_statusesUrl}?limit={limit}";
+                $"{statusesUrl}?limit={limit}&max_id={_oldestId}" :
+                $"{statusesUrl}?limit={limit}";
     }
 
-    public async Task<List<MastodonStatus>> FetchExplorePage(bool loadMore = false)
+    private async Task<List<MastodonStatus>> FetchExplorePage(MastodonInstance instance, int version, bool loadMore = false)
     {
         var statuses = new List<MastodonStatus>();
 
@@ -224,22 +273,38 @@ internal sealed partial class MastodonExtensionPage : ListPage
 
         try
         {
-            // Make a GET request to the Mastodon trends API endpoint
-            var url = PostsUrl(loadMore);
-            var options = new RestClientOptions(url);
-            var client = new RestClient(options);
-            var request = new RestRequest(string.Empty);
+            using var client = ApiConfig.CreateClient(instance);
+            var request = new RestRequest(PostsUrl(instance, loadMore));
             request.AddHeader("accept", "application/json");
-            request.AddHeader("Authorization", $"Bearer {ApiConfig.UserBearerToken}");
-            var response = await client.GetAsync(request);
+            var response = await client.ExecuteAsync(request).ConfigureAwait(false);
+            if (!response.IsSuccessful || string.IsNullOrEmpty(response.Content))
+            {
+                throw new InvalidOperationException($"Could not load posts from {instance.Url}. Check the instance and your login.");
+            }
 
             // Read and deserialize the response JSON into a list of MastodonStatus objects
             var responseBody = response.Content;
-            statuses = JsonSerializer.Deserialize<List<MastodonStatus>>(responseBody, Options);
+            statuses = JsonSerializer.Deserialize<List<MastodonStatus>>(responseBody, Options)
+                ?? throw new JsonException("The Mastodon instance did not return a list of posts.");
+            lock (_items)
+            {
+                if (version == _version)
+                {
+                    ExtensionHost.HideStatus(_errorStatus);
+                }
+            }
         }
-        catch (Exception e)
+        catch (Exception e) when (e is HttpRequestException or JsonException or InvalidOperationException)
         {
-            Console.WriteLine($"An error occurred: {e.Message}");
+            ExtensionHost.LogMessage(new LogMessage() { Message = e.Message });
+            lock (_items)
+            {
+                if (version == _version)
+                {
+                    _errorStatus.Message = e.Message;
+                    ExtensionHost.ShowStatus(_errorStatus, StatusContext.Page);
+                }
+            }
         }
 
         return statuses;
@@ -353,11 +418,13 @@ public partial class MastodonPostForm : FormContent
 public partial class MastodonPostPage : ContentPage
 {
     private readonly MastodonStatus post;
+    private readonly MastodonInstance _instance;
 
-    public MastodonPostPage(MastodonStatus post)
+    internal MastodonPostPage(MastodonStatus post, MastodonInstance instance)
     {
         Name = "View post";
         this.post = post;
+        _instance = instance;
     }
 
     public override IContent[] GetContent()
@@ -374,13 +441,17 @@ public partial class MastodonPostPage : ContentPage
         var replies = new List<MastodonStatus>([this.post]);
         try
         {
-            // Make a GET request to the Mastodon context API endpoint
-            var url = $"https://mastodon.social/api/v1/statuses/{post.Id}/context";
-            var response = await MastodonExtensionPage.Client.GetAsync(url);
-            response.EnsureSuccessStatusCode();
+            using var client = ApiConfig.CreateClient(_instance);
+            var request = new RestRequest($"/api/v1/statuses/{post.Id}/context");
+            request.AddHeader("accept", "application/json");
+            var response = await client.ExecuteAsync(request).ConfigureAwait(false);
+            if (!response.IsSuccessful || string.IsNullOrEmpty(response.Content))
+            {
+                throw new InvalidOperationException($"Could not load replies from {_instance.Url}.");
+            }
 
             // Read and deserialize the response JSON into a MastodonContext object
-            var responseBody = await response.Content.ReadAsStringAsync();
+            var responseBody = response.Content;
             var context = JsonSerializer.Deserialize<MastodonContext>(responseBody, MastodonExtensionPage.Options);
 
             // Extract the list of replies (descendants)
@@ -390,9 +461,10 @@ public partial class MastodonPostPage : ContentPage
                 replies.AddRange(context.Descendants);
             }
         }
-        catch (Exception e)
+        catch (Exception e) when (e is HttpRequestException or JsonException or InvalidOperationException)
         {
-            Console.WriteLine($"An error occurred: {e.Message}");
+            ExtensionHost.LogMessage(new LogMessage() { Message = e.Message });
+            ExtensionHost.ShowStatus(new StatusMessage() { Message = e.Message, State = MessageState.Error }, StatusContext.Page);
         }
 
         return replies;
@@ -403,12 +475,14 @@ public partial class MastodonPostPage : ContentPage
 public partial class FavoritePostCommand : InvokableCommand
 {
     private readonly MastodonStatus _post;
+    private readonly MastodonInstance _instance;
 
     public event TypedEventHandler<FavoritePostCommand, bool> FavoritedChanged;
 
-    public FavoritePostCommand(MastodonStatus post)
+    internal FavoritePostCommand(MastodonStatus post, MastodonInstance instance)
     {
         this._post = post;
+        _instance = instance;
         UpdateName();
     }
 
@@ -430,22 +504,18 @@ public partial class FavoritePostCommand : InvokableCommand
     {
         var verb = _post.Favorited ? "unfavourite" : "favourite";
 
-        var client = new RestClient("https://mastodon.social");
-        var endpoint = $"/api/v1/statuses/{_post.Id}/{verb}";
-        var request = new RestRequest(endpoint, Method.Post);
-        request.AddHeader("accept", "application/json");
-        request.AddHeader("Authorization", $"Bearer {ApiConfig.UserBearerToken}");
-
-        var task = client.ExecuteAsync(request);
-        task.ConfigureAwait(false);
-        var response = task.Result;
-        var content = response.Content;
-        if (response.IsSuccessful)
+        try
         {
+            ApiConfig.SendPostAction(_instance, _post.Id, verb);
             _post.Favorited = !_post.Favorited;
             _post.Favorites += _post.Favorited ? 1 : -1;
             UpdateName();
             FavoritedChanged?.Invoke(this, _post.Favorited);
+        }
+        catch (Exception e) when (e is HttpRequestException or InvalidOperationException)
+        {
+            ExtensionHost.LogMessage(new LogMessage() { Message = e.Message });
+            return CommandResult.ShowToast(e.Message);
         }
 
         return CommandResult.KeepOpen();
@@ -456,12 +526,14 @@ public partial class FavoritePostCommand : InvokableCommand
 public partial class BoostPostCommand : InvokableCommand
 {
     private readonly MastodonStatus _post;
+    private readonly MastodonInstance _instance;
 
     public event TypedEventHandler<BoostPostCommand, bool> BoostedChanged;
 
-    public BoostPostCommand(MastodonStatus post)
+    internal BoostPostCommand(MastodonStatus post, MastodonInstance instance)
     {
         this._post = post;
+        _instance = instance;
         UpdateName();
     }
 
@@ -483,22 +555,18 @@ public partial class BoostPostCommand : InvokableCommand
     {
         var verb = _post.Reblogged ? "unreblog" : "reblog";
 
-        var client = new RestClient("https://mastodon.social");
-        var endpoint = $"/api/v1/statuses/{_post.Id}/{verb}";
-        var request = new RestRequest(endpoint, Method.Post);
-        request.AddHeader("accept", "application/json");
-        request.AddHeader("Authorization", $"Bearer {ApiConfig.UserBearerToken}");
-
-        var task = client.ExecuteAsync(request);
-        task.ConfigureAwait(false);
-        var response = task.Result;
-        var content = response.Content;
-        if (response.IsSuccessful)
+        try
         {
+            ApiConfig.SendPostAction(_instance, _post.Id, verb);
             _post.Reblogged = !_post.Reblogged;
             _post.Boosts += _post.Reblogged ? 1 : -1;
             UpdateName();
             BoostedChanged?.Invoke(this, _post.Reblogged);
+        }
+        catch (Exception e) when (e is HttpRequestException or InvalidOperationException)
+        {
+            ExtensionHost.LogMessage(new LogMessage() { Message = e.Message });
+            return CommandResult.ShowToast(e.Message);
         }
 
         return CommandResult.KeepOpen();
@@ -508,27 +576,61 @@ public partial class BoostPostCommand : InvokableCommand
 [System.Diagnostics.CodeAnalysis.SuppressMessage("StyleCop.CSharp.MaintainabilityRules", "SA1402:File may only contain a single type", Justification = "This is sample code")]
 public partial class MastodonLoginForm : FormContent
 {
+    private readonly MastodonInstance _instance;
+
     public MastodonLoginForm()
     {
+        _instance = ApiConfig.Instance;
     }
 
     public override ICommandResult SubmitForm(string inputs)
     {
-        var formInput = JsonNode.Parse(inputs)?.AsObject();
-        if (formInput.TryGetPropertyValue("Token", out var code))
+        try
         {
-            var codeString = code.ToString();
-            _ = ApiConfig.LoginUser(codeString).ConfigureAwait(false);
-        }
+            var formInput = JsonNode.Parse(inputs)?.AsObject();
+            if (formInput == null || !formInput.TryGetPropertyValue("Token", out var code) || string.IsNullOrWhiteSpace(code?.ToString()))
+            {
+                return CommandResult.ShowToast("Enter the authorization code from your Mastodon instance.");
+            }
 
-        return CommandResult.GoHome();
+            ApiConfig.LoginUser(code.ToString().Trim(), _instance.Url).GetAwaiter().GetResult();
+            return CommandResult.GoHome();
+        }
+        catch (Exception e) when (e is HttpRequestException or JsonException or InvalidOperationException or COMException)
+        {
+            ExtensionHost.LogMessage(new LogMessage() { Message = e.Message });
+            return CommandResult.ShowToast(e.Message);
+        }
     }
 
     public override string TemplateJson
     {
         get
         {
-            var browserUrl = $"https://mastodon.social/oauth/authorize?client_id={ApiConfig.ClientId}&scope=read+write+push&redirect_uri=urn:ietf:wg:oauth:2.0:oob&response_type=code";
+            string browserUrl;
+            try
+            {
+                ApiConfig.GetClientIdAndSecret().GetAwaiter().GetResult();
+                browserUrl = ApiConfig.AuthorizationUrl(_instance);
+            }
+            catch (Exception e) when (e is HttpRequestException or JsonException or InvalidOperationException or COMException)
+            {
+                ExtensionHost.LogMessage(new LogMessage() { Message = e.Message });
+                return $$"""
+{
+    "$schema": "http://adaptivecards.io/schemas/adaptive-card.json",
+    "type": "AdaptiveCard",
+    "version": "1.6",
+    "body": [
+        {
+            "type": "TextBlock",
+            "text": {{JsonSerializer.Serialize(e.Message)}},
+            "wrap": true
+        }
+    ]
+}
+""";
+            }
 
             return $$"""
 {
@@ -550,7 +652,8 @@ public partial class MastodonLoginForm : FormContent
             "label": "Username",
             "isRequired": true,
             "errorMessage": "Username is required",
-            "text": "Login using the browser window, then copy and paste the token into this page."
+            "text": {{JsonSerializer.Serialize($"Login to {_instance.Url} using the browser window, then copy and paste the authorization code into this page.")}},
+            "wrap": true
         },
         {
             "type": "Input.Text",
@@ -565,7 +668,7 @@ public partial class MastodonLoginForm : FormContent
         {
             "type": "Action.OpenUrl",
             "title": "Open browser to login",
-            "url": "{{browserUrl}}"
+            "url": {{JsonSerializer.Serialize(browserUrl)}}
         },
         {
             "type": "Action.Submit",
@@ -588,7 +691,7 @@ public partial class MastodonLoginPage : ContentPage
     {
         Name = "Login";
         Title = "Login to Mastodon";
-        Icon = new("https://mastodon.social/packs/media/icons/android-chrome-36x36-4c61fdb42936428af85afdbf8c6a45a8.png");
+        Icon = MastodonExtensionPage.MastodonIcon;
 
         // #6364ff
         AccentColor = ColorHelpers.FromRgb(99, 100, 255);

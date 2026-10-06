@@ -26,7 +26,7 @@
       "project": "src\\extensions\\MastodonExtension\\MastodonExtension.csproj",
       "identityName": "zadjii.MastodonforCommandPalette",
       "displayName": "Mastodon for Command Palette",
-      "description": "Browse mastodon.social timelines and interact with posts from Command Palette.",
+      "description": "Browse timelines on your chosen Mastodon instance and interact with posts from Command Palette.",
       "color": "#4654B8",
       "symbol": "chat",
       "storeId": null

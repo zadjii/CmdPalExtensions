@@ -4,28 +4,27 @@
 
 using System;
 using System.Collections.Generic;
-using System.Diagnostics;
 using System.IO;
 using System.Linq;
-using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.CommandPalette.Extensions;
 using Microsoft.CommandPalette.Extensions.Toolkit;
-using RestSharp;
 
 namespace TmdbExtension;
 
 internal sealed partial class TmdbExtensionPage : DynamicListPage, IDisposable
 {
-    private readonly Lock _resultsLock = new();
     private readonly Lock _searchLock = new();
+    private readonly TmdbClient _client;
     private CancellationTokenSource? _cancellationTokenSource;
+    private bool _disposed;
 
     private IListItem[] _results = [];
 
-    public TmdbExtensionPage()
+    public TmdbExtensionPage(TmdbClient? client = null)
     {
+        _client = client ?? TmdbClient.Shared;
         Id = "MovieSearch";
         Icon = IconHelpers.FromRelativePath("Assets\\Tmdb-312x276-logo.png");
         Name = "Search Movies";
@@ -34,7 +33,7 @@ internal sealed partial class TmdbExtensionPage : DynamicListPage, IDisposable
 
     public override IListItem[] GetItems()
     {
-        lock (_resultsLock)
+        lock (_searchLock)
         {
             return _results.Length > 0 ? _results : [
                 new ListItem(new NoOpCommand()) { Title = "No results found" }
@@ -49,107 +48,88 @@ internal sealed partial class TmdbExtensionPage : DynamicListPage, IDisposable
             return;
         }
 
-        if (string.IsNullOrEmpty(newSearch))
+        StartSearch(newSearch);
+    }
+
+    internal void Refresh() => StartSearch(SearchText);
+
+    private void StartSearch(string query)
+    {
+        lock (_searchLock)
         {
-            lock (_resultsLock)
+            if (_disposed)
             {
-                this._results = [];
+                return;
             }
 
-            RaiseItemsChanged(_results.Length);
-            return;
-        }
+            _cancellationTokenSource?.Cancel();
+            _cancellationTokenSource = null;
+            _results = [];
+            if (string.IsNullOrWhiteSpace(query))
+            {
+                IsLoading = false;
+                RaiseItemsChanged(0);
+                return;
+            }
 
-        _ = Task.Run(async () =>
+            var currentCts = _cancellationTokenSource = new CancellationTokenSource();
+            IsLoading = true;
+            _ = SearchAsync(query, currentCts);
+        }
+    }
+
+    private async Task SearchAsync(string query, CancellationTokenSource currentCts)
+    {
+        try
         {
-            CancellationTokenSource? oldCts, currentCts;
+            var results = await DoSearchAsync(query, currentCts.Token);
             lock (_searchLock)
             {
-                oldCts = _cancellationTokenSource;
-                currentCts = _cancellationTokenSource = new CancellationTokenSource();
+                if (_cancellationTokenSource == currentCts)
+                {
+                    _results = results;
+                    RaiseItemsChanged(_results.Length);
+                }
             }
-
-            IsLoading = true;
-            oldCts?.Cancel();
-            var currentSearch = SearchText;
-            Debug.WriteLine($"Starting search for '{currentSearch}'");
-            var task = Task.Run(
-                () =>
-                {
-                    // Were we already canceled?
-                    currentCts.Token.ThrowIfCancellationRequested();
-                    return DoSearchAsync(newSearch, currentCts.Token);
-                },
-                currentCts.Token);
-
-            try
+        }
+        catch (OperationCanceledException) when (currentCts.IsCancellationRequested)
+        {
+            // A newer query or disposal owns the page now.
+        }
+        catch (Exception exception)
+        {
+            lock (_searchLock)
             {
-                var results = await task;
-                Debug.WriteLine($"Completed search for '{currentSearch}'");
-                lock (_resultsLock)
+                if (_cancellationTokenSource == currentCts)
                 {
-                    this._results = results;
+                    _results = [TmdbError.CreateItem("Unable to search TMDB", exception)];
+                    RaiseItemsChanged(_results.Length);
+                }
+            }
+        }
+        finally
+        {
+            lock (_searchLock)
+            {
+                if (_cancellationTokenSource == currentCts)
+                {
+                    _cancellationTokenSource = null;
+                    IsLoading = false;
                 }
 
-                IsLoading = false;
-
-                RaiseItemsChanged(this._results.Length);
+                currentCts.Dispose();
             }
-            catch (OperationCanceledException)
-            {
-                // We were cancelled? oh no. Anyways.
-                Debug.WriteLine($"Cancelled search for {currentSearch}");
-            }
-            catch (Exception)
-            {
-                Debug.WriteLine($"Something else weird happened in {currentSearch}");
-                IsLoading = false;
-            }
-            finally
-            {
-                lock (_searchLock)
-                {
-                    currentCts?.Dispose();
-                }
-
-                Debug.WriteLine($"Finally for '{currentSearch}'");
-            }
-        });
+        }
     }
 
     private async Task<IListItem[]> DoSearchAsync(string query, CancellationToken ct)
     {
-        // IsLoading = true;
-        var options = new RestClientOptions($"https://api.themoviedb.org/3/search/movie?query={Uri.EscapeDataString(query)}");
-        var client = new RestClient(options);
-        var request = new RestRequest(string.Empty);
-        request.AddHeader("accept", "application/json");
-        request.AddHeader("Authorization", $"Bearer {ApiConfig.UserBearerToken}");
-
-        ct.ThrowIfCancellationRequested();
-
-        var response = await client.GetAsync(request, cancellationToken: ct);
-        var content = response.Content;
-
-        if (string.IsNullOrEmpty(content))
-        {
-            // IsLoading = false;
-            return [];
-        }
-
-        var json = JsonSerializer.Deserialize<MovieSearchResponse>(content);
-        if (json == null)
-        {
-            // IsLoading = false;
-            throw new InvalidDataException("Somehow got null data from the movie search");
-        }
-
-        var movies = json.Results;
+        var movies = await _client.SearchMoviesAsync(query, ct);
         var r = movies.Select(m =>
         {
             ct.ThrowIfCancellationRequested();
 
-            var moviePage = new TmdbMoviePage(m);
+            var moviePage = new TmdbMoviePage(m, _client);
             return new ListItem(moviePage)
             {
                 Title = $"{m.Title} ({m.ReleaseYear})",
@@ -163,8 +143,13 @@ internal sealed partial class TmdbExtensionPage : DynamicListPage, IDisposable
 
     public void Dispose()
     {
-        _cancellationTokenSource?.Cancel();
-        _cancellationTokenSource?.Dispose();
+        lock (_searchLock)
+        {
+            _disposed = true;
+            _cancellationTokenSource?.Cancel();
+            _cancellationTokenSource = null;
+            IsLoading = false;
+        }
     }
 }
 
@@ -172,13 +157,17 @@ internal sealed partial class TmdbExtensionPage : DynamicListPage, IDisposable
 internal sealed partial class TmdbMoviePage : ListPage
 {
     private readonly MovieSearchResult _movie;
+    private readonly TmdbClient _client;
+    private readonly Lock _loadLock = new();
+    private bool _loadStarted;
     private IListItem[] _results = [];
 
     public Details Details { get; private set; }
 
-    public TmdbMoviePage(MovieSearchResult movie)
+    public TmdbMoviePage(MovieSearchResult movie, TmdbClient client)
     {
         _movie = movie;
+        _client = client;
         Name = "View";
         ShowDetails = true;
 
@@ -195,40 +184,46 @@ internal sealed partial class TmdbMoviePage : ListPage
 
     public override IListItem[] GetItems()
     {
-        if (_results.Length == 0)
+        lock (_loadLock)
         {
-            _ = DoSearchAsync();
-            return [];
-        }
+            if (!_loadStarted)
+            {
+                _loadStarted = true;
+                _ = LoadDetailsAsync();
+            }
 
-        return _results;
+            return _results;
+        }
     }
 
-    private async Task DoSearchAsync()
+    private async Task LoadDetailsAsync()
     {
         IsLoading = true;
-        var options = new RestClientOptions($"https://api.themoviedb.org/3/movie/{_movie.Id}?append_to_response=watch%2Fproviders");
-        var client = new RestClient(options);
-        var request = new RestRequest(string.Empty);
-        request.AddHeader("accept", "application/json");
-        request.AddHeader("Authorization", $"Bearer {ApiConfig.UserBearerToken}");
-        var response = await client.GetAsync(request);
-        var content = response.Content;
-
-        if (string.IsNullOrEmpty(content))
+        try
+        {
+            var movieDetails = await _client.GetMovieDetailsAsync(_movie.Id);
+            var items = CreateItems(movieDetails);
+            lock (_loadLock)
+            {
+                _results = items;
+            }
+        }
+        catch (Exception exception)
+        {
+            lock (_loadLock)
+            {
+                _results = [TmdbError.CreateItem("Unable to load movie details", exception)];
+            }
+        }
+        finally
         {
             IsLoading = false;
-            return;
+            RaiseItemsChanged(_results.Length);
         }
+    }
 
-        var movieDetails = JsonSerializer.Deserialize<MovieDetailsResponse>(content);
-
-        if (movieDetails == null)
-        {
-            IsLoading = false;
-            throw new InvalidDataException("Somehow got null data from the movie details");
-        }
-
+    private IListItem[] CreateItems(MovieDetailsResponse movieDetails)
+    {
         Details = new Details()
         {
             Title = _movie.Title,
@@ -291,12 +286,6 @@ internal sealed partial class TmdbMoviePage : ListPage
             }
         }
 
-        _results = items.ToArray();
-        IsLoading = false;
-        RaiseItemsChanged(_results.Length);
-
-        // Once we get the ID
-        // https://api.themoviedb.org/3/movie/{movie_id}?append_to_response=watch%2Fproviders
-        // var options = new RestClientOptions("https://api.themoviedb.org/3/movie/13669/watch/providers");
+        return items.ToArray();
     }
 }

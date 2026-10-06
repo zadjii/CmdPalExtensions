@@ -33,7 +33,7 @@
       EntryPoint="$targetentrypoint$">
       <uap:VisualElements
         DisplayName="Mastodon for Command Palette"
-        Description="Browse mastodon.social timelines and interact with posts from Command Palette."
+        Description="Browse timelines on your chosen Mastodon instance and interact with posts from Command Palette."
         BackgroundColor="transparent"
         Square150x150Logo="Assets\Package\Square150x150Logo.png"
         Square44x44Logo="Assets\Package\Square44x44Logo.png">
@@ -53,7 +53,7 @@
             Id="PG-SP-ID"
             PublicFolder="Public"
             DisplayName="Mastodon for Command Palette"
-            Description="Browse mastodon.social timelines and interact with posts from Command Palette.">
+            Description="Browse timelines on your chosen Mastodon instance and interact with posts from Command Palette.">
             <uap3:Properties>
               <CmdPalProvider>
                 <Activation>

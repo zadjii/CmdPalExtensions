@@ -14,6 +14,7 @@
 
   <ItemGroup>
     <Manifest Include="$(ApplicationManifest)" />
+    <InternalsVisibleTo Include="TmdbExtension.Tests" />
   </ItemGroup>
 
 

@@ -8,6 +8,7 @@
 Search movies and inspect details or available streaming providers in PowerToys
 Command Palette. Requires internet access, PowerToys Command Palette, and your
 own TMDB API Read Access Token configured in the extension.
+Choose the language of movie results and details in the extension settings.
 This product uses the TMDB API but is not endorsed or certified by TMDB.
 Watch-provider availability is supplied through TMDB and powered by JustWatch.
 No movie playback or subscription is included.
@@ -30,7 +31,8 @@ is not a substitute for service-required in-product attribution. The command's *
 attribution** context action provides the TMDB notice, its existing logo,
 JustWatch credit, and privacy/support links, both before and after token setup.
 
-Test unset/invalid/valid tokens, search with no results, details, provider links,
+Test unset/invalid/valid tokens, search with no results, result-language changes,
+details, provider links,
 offline behavior, token reconfiguration, and launch help on x64 and ARM64.
 Check the About page and provider attribution in the actual host UI.
 Arrange reviewer access according to API terms without committing a token.

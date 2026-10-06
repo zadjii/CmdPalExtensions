@@ -11,7 +11,7 @@ Each extension is its own app/package, not one combined installation.
 | --- | --- | --- |
 | Hacker News | Browse top stories and open articles/discussions | [Details](doc/store/listings/hackernews.md) |
 | Obsidian Notes | Search, preview, edit, and open notes in a local vault | [Details](doc/store/listings/obsidian.md) |
-| Mastodon | Browse mastodon.social and interact with posts | [Details](doc/store/listings/mastodon.md) |
+| Mastodon | Browse your chosen Mastodon instance and interact with posts | [Details](doc/store/listings/mastodon.md) |
 | TMDB Search | Search movies and streaming providers with your TMDB API token | [Details](doc/store/listings/tmdb.md) |
 | Segoe Icons | Find and copy icon characters or XAML | [Details](doc/store/listings/icons.md) |
 | Edge Favorites | Search favorites in supported Edge Default profiles | [Details](doc/store/listings/favorites.md) |
@@ -90,3 +90,51 @@ resources have not been deleted and are no longer used by this workflow.
 [MIT license](LICENSE) · [Privacy policy](PRIVACY.md) ·
 [Third-party notices](THIRD-PARTY-NOTICES.md) ·
 [Support/issues](https://github.com/zadjii/CmdPalExtensions/issues)
+
+## Mastodon home instance
+
+Open the Mastodon extension's settings in Command Palette (also available from
+the login, explore, and home commands) and set **Home instance** to your server's
+hostname or HTTPS URL, such as `fosstodon.org` or `https://fosstodon.org`.
+Use the server's base URL, without a path or query.
+
+Login, Explore, your home timeline, replies, favorites, and boosts all use the
+selected instance. Changing instances refreshes the timelines and switches to
+that instance's saved login, or asks you to sign in if you have not used it before.
+Credentials are stored separately for each instance; existing mastodon.social
+logins continue to work. Logging out only removes the selected instance's login.
+
+Run the Mastodon instance regression tests with
+`dotnet test .\src\extensions\MastodonExtension.Tests\MastodonExtension.Tests.csproj -p:Platform=x64 -p:RestoreConfigFile="$PWD\.github\nuget.config"`.
+
+## TMDB Search setup
+
+Sign in to [TMDB's API settings](https://www.themoviedb.org/settings/api) and
+copy your **API Read Access Token** into the extension's login form. Use the
+read access token, not your TMDB password or API key. Signing in to the TMDB
+website alone does not authenticate the extension. The token is stored in
+Windows Credential Manager. Use **Update TMDB API token** in the search command's
+context menu to replace it.
+
+Open the extension's settings from Command Palette settings or the command's
+context menu to set **Language**. Both movie searches and movie details use this
+language code (for example, `fr`, `it`, or `en-US`). The default is `en-US`;
+leaving the setting blank also uses `en-US`. This changes the language of
+returned titles, descriptions, and genres, not the movies' original language
+or the streaming-provider region (currently US).
+
+Authentication, network, and API errors are shown separately from an empty
+search result. If authentication fails, open the error item to enter your
+API Read Access Token again.
+
+## Contributing
+
+Contributions and regression tests are welcome.
+
+Run the TMDB regression tests on Windows with the .NET 9 SDK or later:
+
+```powershell
+dotnet test .\src\extensions\TmdbExtension.Tests\TmdbExtension.Tests.csproj -p:Platform=x64 -p:RestoreConfigFile="$PWD\.github\nuget.config"
+```
+
+These tests use simulated HTTP responses; no TMDB account or API token is required.
