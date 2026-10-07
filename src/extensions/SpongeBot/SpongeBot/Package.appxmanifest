@@ -9,20 +9,17 @@
   IgnorableNamespaces="uap uap3 rescap">
 
   <Identity
-    Name="SpongeBot"
-    Publisher="CN=Michael Griese, O=Michael Griese, L=Verona, S=Wisconsin, C=US"
-    Version="0.0.1.0" />
-  <!-- When you're ready to publish your extension, you'll need to change the
-       Publisher= to match your own identity -->
+    Name="zadjii.SpongeBotforCommandPalette"
+    Publisher="CN=5C876BBB-0FB4-4B0F-A120-BE7215903BDF"
+    Version="0.1.0.0" />
 
   <Properties>
     <DisplayName>SpongeBot for Command Palette</DisplayName>
-    <PublisherDisplayName>zadjii</PublisherDisplayName>
-    <Logo>Assets\StoreLogo.png</Logo>
+    <PublisherDisplayName>zadjii.</PublisherDisplayName>
+    <Logo>Assets\Package\StoreLogo.png</Logo>
   </Properties>
 
   <Dependencies>
-    <TargetDeviceFamily Name="Windows.Universal" MinVersion="10.0.19041.0" MaxVersionTested="10.0.19041.0" />
     <TargetDeviceFamily Name="Windows.Desktop" MinVersion="10.0.19041.0" MaxVersionTested="10.0.19041.0" />
   </Dependencies>
 
@@ -36,18 +33,18 @@
       EntryPoint="$targetentrypoint$">
       <uap:VisualElements
         DisplayName="SpongeBot for Command Palette"
-        Description="Spongebot generates MoCkInG CaSe text for the Command Palette"
+        Description="Convert text to alternating upper and lower case and copy it from Command Palette."
         BackgroundColor="transparent"
-        Square150x150Logo="Assets\Square150x150Logo.png"
-        Square44x44Logo="Assets\Square44x44Logo.png">
-        <uap:DefaultTile Wide310x150Logo="Assets\Wide310x150Logo.png"  Square71x71Logo="Assets\SmallTile.png" Square310x310Logo="Assets\LargeTile.png"/>
-        <uap:SplashScreen Image="Assets\SplashScreen.png" />
+        Square150x150Logo="Assets\Package\Square150x150Logo.png"
+        Square44x44Logo="Assets\Package\Square44x44Logo.png">
+        <uap:DefaultTile Wide310x150Logo="Assets\Package\Wide310x150Logo.png"  Square71x71Logo="Assets\Package\SmallTile.png" Square310x310Logo="Assets\Package\LargeTile.png"/>
+        <uap:SplashScreen Image="Assets\Package\SplashScreen.png" />
       </uap:VisualElements>
       <Extensions>
         <com:Extension Category="windows.comServer">
           <com:ComServer>
-            <com:ExeServer Executable="SpongeBotExtension.exe" Arguments="-RegisterProcessAsComServer" DisplayName="Spongebot">
-              <com:Class Id="4e3a46a2-1849-47a5-9c3a-f9a39d15338f" DisplayName="Spongebot" />
+            <com:ExeServer Executable="SpongeBotExtension.exe" Arguments="-RegisterProcessAsComServer" DisplayName="SpongeBot for Command Palette">
+              <com:Class Id="4e3a46a2-1849-47a5-9c3a-f9a39d15338f" DisplayName="SpongeBot for Command Palette" />
             </com:ExeServer>
           </com:ComServer>
         </com:Extension>
@@ -55,8 +52,8 @@
           <uap3:AppExtension Name="com.microsoft.commandpalette"
             Id="ID"
             PublicFolder="Public"
-            DisplayName="Spongebot"
-            Description="Generates MoCkInG CaSe text">
+            DisplayName="SpongeBot for Command Palette"
+            Description="Convert text to alternating upper and lower case and copy it from Command Palette.">
             <uap3:Properties>
               <CmdPalProvider>
                 <Activation>

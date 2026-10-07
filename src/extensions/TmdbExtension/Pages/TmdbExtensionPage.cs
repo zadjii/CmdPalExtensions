@@ -26,7 +26,7 @@ internal sealed partial class TmdbExtensionPage : DynamicListPage, IDisposable
     {
         _client = client ?? TmdbClient.Shared;
         Id = "MovieSearch";
-        Icon = new(Path.Combine(AppDomain.CurrentDomain.BaseDirectory.ToString(), "Assets\\Tmdb-312x276-logo.png"));
+        Icon = IconHelpers.FromRelativePath("Assets\\Tmdb-312x276-logo.png");
         Name = "Search Movies";
         ShowDetails = true;
     }

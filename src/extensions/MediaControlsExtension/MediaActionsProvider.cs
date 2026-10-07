@@ -23,4 +23,11 @@ public partial class MediaActionsProvider : CommandProvider
     {
         return _actions;
     }
+
+    public override void Dispose()
+    {
+        ((MediaListItem)_actions[0]).Dispose();
+        base.Dispose();
+        GC.SuppressFinalize(this);
+    }
 }

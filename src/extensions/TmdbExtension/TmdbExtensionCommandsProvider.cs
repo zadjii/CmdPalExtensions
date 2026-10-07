@@ -23,13 +23,14 @@ public partial class TmdbExtensionActionsProvider : CommandProvider
     public TmdbExtensionActionsProvider()
     {
         DisplayName = "TMDB Search Commands";
-        Icon = new(Path.Combine(AppDomain.CurrentDomain.BaseDirectory.ToString(), "Assets\\Tmdb-312x276-logo.png"));
+        Icon = IconHelpers.FromRelativePath("Assets\\Tmdb-312x276-logo.png");
         Settings = SettingsManager.Instance.Settings;
 
         _logoutItem = new CommandContextItem(new LogoutCommand())
         {
             Title = "Logout of TMDB",
         };
+        var aboutItem = new CommandContextItem(new TmdbAboutPage());
 
         var loginPage = new TmdbLoginPage();
         var settingsItem = new CommandContextItem(Settings.SettingsPage);
@@ -40,12 +41,13 @@ public partial class TmdbExtensionActionsProvider : CommandProvider
                 new CommandContextItem(loginPage) { Title = "Update TMDB API token" },
                 _logoutItem,
                 settingsItem,
+                aboutItem,
             ],
         };
         _loginItem = new CommandItem(loginPage)
         {
             Title = "Login to search TMDB for movies",
-            MoreCommands = [settingsItem],
+            MoreCommands = [settingsItem, aboutItem],
         };
 
         ApiConfig.UserTokenChanged += OnUserTokenChanged;

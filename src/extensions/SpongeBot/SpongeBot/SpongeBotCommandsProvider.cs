@@ -14,8 +14,8 @@ public partial class SpongeBotCommandsProvider : CommandProvider
 
     public SpongeBotCommandsProvider()
     {
-        DisplayName = "Spongebob, mocking";
-        Icon = IconHelpers.FromRelativePath("Assets\\StoreLogo.scale-400.png");
+        DisplayName = "SpongeBot - alternating case";
+        Icon = IconHelpers.FromRelativePath("Assets\\Package\\StoreLogo.scale-400.png");
         Frozen = false;
     }
 
@@ -36,7 +36,7 @@ internal sealed partial class FallbackSpongeTextItem : FallbackCommandItem
         : base(new NoOpCommand(), "Convert text to mOcKiNg CaSe")
     {
         Title = _copyCommand.Name = string.Empty;
-        Icon = new IconInfo("https://imgflip.com/s/meme/Mocking-Spongebob.jpg");
+        Icon = IconHelpers.FromRelativePath("Assets\\Package\\StoreLogo.scale-400.png");
     }
 
     public override void UpdateQuery(string query)

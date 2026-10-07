@@ -1,72 +1,97 @@
-# Mike's Big Command Palette Extension Bundle
+# Mike's Command Palette Extensions
 
-This repo is a collection of extensions for the Windows Command Palette. Most of
-these are goof-around projects for me, just to see if it is possible. 
-
-These are open for community contributions. I definitely don't have the time to flush out the features of all these myself, but I'm happy to accept PRs.
+A collection of independent extensions for [PowerToys Command Palette](https://aka.ms/powertoys).
+Contributions are welcome.
 
 ## Extensions
 
-<table><thead>
-  <tr>
-    <th>Extension</th>
-    <th>x64 Link</th>
-    <th>Description</th>
-  </tr></thead>
-<tbody>
-  <tr>
-    <td>TMDB Search</td>
-    <td>
+Each extension is its own app/package, not one combined installation.
 
-[v0.0.4](https://github.com/zadjii/CmdPalExtensions/releases/download/tmdb%2Fv0.0.4/TmdbExtension_0.0.4.0_x64.msix)
-    </td>
-    <td>Search for movies, and find out what streaming services they're available on.</td>
-  </tr>
-  <tr>
-    <td>Obsidian</td>
-    <td>
+| Extension | Description | Store listing draft |
+| --- | --- | --- |
+| Hacker News | Browse top stories and open articles/discussions | [Details](doc/store/listings/hackernews.md) |
+| Obsidian Notes | Search, preview, edit, and open notes in a local vault | [Details](doc/store/listings/obsidian.md) |
+| Mastodon | Browse your chosen Mastodon instance and interact with posts | [Details](doc/store/listings/mastodon.md) |
+| TMDB Search | Search movies and streaming providers with your TMDB API token | [Details](doc/store/listings/tmdb.md) |
+| Segoe Icons | Find and copy icon characters or XAML | [Details](doc/store/listings/icons.md) |
+| Edge Favorites | Search favorites in supported Edge Default profiles | [Details](doc/store/listings/favorites.md) |
+| NFL Scores | View ESPN game scores and details | [Details](doc/store/listings/nfl.md) |
+| SpongeBot | Convert text to alternating case and copy it | [Details](doc/store/listings/sponge.md) |
+| Media Controls | Control the active Windows media session | [Details](doc/store/listings/media.md) |
 
-[v0.0.5](https://github.com/zadjii/CmdPalExtensions/releases/download/obsidian%2Fv0.0.5/ObsidianExtension_0.0.5.0_x64.msix)
-    </td>
-    <td>Search your notes in Obsidian. View them in the palette & make quick edits</td>
-  </tr>
-  <tr>
-    <td>Mastodon</td>
-    <td>
+**Store publishing is being prepared; these are not live Store listings.**
+[Historical GitHub releases](https://github.com/zadjii/CmdPalExtensions/releases)
+remain available as legacy, x64-only sideload packages. New CI artifacts are
+unsigned Store submissions, **not sideload installers**.
 
-[v0.0.4](https://github.com/zadjii/CmdPalExtensions/releases/download/mastodon%2Fv0.0.4/MastodonExtension_0.0.4.0_x64.msix)
-    </td>
-    <td>Explore posts on your Mastodon instance, sign in to view your home timeline, and favorite or boost posts. Choose your home instance in the extension settings (defaults to mastodon.social).
-</td>
-  </tr>
-  <tr>
-    <td>Segoe Icons</td>
-    <td>
+After installing a published extension, enable Command Palette in PowerToys and
+open it with `Win+Alt+Space` (or your configured shortcut). Starting an extension
+directly displays a short console explanation instead of opening a standalone
+app. SpongeBot appears as a fallback action for typed text.
 
-[v0.0.3](https://github.com/zadjii/CmdPalExtensions/releases/download/icons%2Fv0.0.3/SegoeIconsExtension_0.0.3.0_x64.msix)
-    </td>
-    <td>Search the big list of Segoe Fluent icons.</td>
-  </tr>
-  <tr>
-    <td>Hacker News</td>
-    <td>
+## Package builds
 
-[v0.0.5](https://github.com/zadjii/CmdPalExtensions/releases/download/hackernews%2Fv0.0.5/HackerNewsExtension_0.0.5.0_x64.msix)
-    </td>
-    <td>View top posts on Hacker News</td>
-  </tr>
-  <tr>
-    <td>Media Controls (BROKEN)</td>
-    <td>
+The **Build Store bundles** workflow builds all nine shipping extensions for
+x64 and ARM64 and produces **nine separate `.msixbundle` files**, each containing
+both architectures. `src/store-apps.json` is the explicit application catalog;
+the development template is excluded. Packages include their .NET runtime, so
+users do not need to install a separate developer runtime. Missing apps/architectures, duplicates,
+identity/version mismatches, and missing packaged artwork/legal documents fail
+validation. The `store-msixbundles` artifact is a download archive containing the
+independent bundles, not a tenth combined app.
 
-[v0.0.1](https://github.com/zadjii/CmdPalExtensions/releases/download/v0.0.1/MediaControlsExtension_0.0.1.0_x64.msix)
-    </td>
-    <td>Control playing media. This one is buggy, and hasn't been updated since early CmdPal builds. It needs love</td>
-  </tr>
-</tbody>
-</table>
+Store submissions do not need our former public-CA signature. Microsoft Store
+signs packages for distribution after approval. CI has no Azure authentication,
+signing job, Store upload, or automatic publishing step.
 
-### Mastodon home instance
+On Windows, with the .NET 9 SDK and Windows SDK installed, run from the repo root:
+
+```powershell
+.\src\tools\tests\StoreReadiness.Tests.ps1
+.\src\tools\tests\MsixPackaging.Tests.ps1
+.\src\tools\tests\MediaControls.Tests.ps1
+.\src\tools\Build-StorePackages.ps1 -Platform x64
+.\src\tools\Build-StorePackages.ps1 -Platform ARM64
+.\src\tools\New-MsixBundles.ps1
+.\src\tools\Test-StoreReadiness.ps1 -BundlesPath .\artifacts\bundles
+```
+
+Use fresh `artifacts\packages` and `artifacts\bundles` directories; scripts reject
+stale output rather than mixing old identities into submissions. `global.json`
+selects .NET 9, and `.github\nuget.config` uses public NuGet packages instead of the
+optional local SDK feed in the root configuration.
+
+Package and 300x300 Store listing icons are checked in. The existing Obsidian,
+TMDB, and WinUI Gallery artwork is reused without changing its colors or aspect
+ratio; replacements are limited to template/corrupt assets and SpongeBot's
+cartoon artwork, which has no recorded redistribution permission. See the
+[artwork inventory](doc/store/README.md#artwork).
+To regenerate, use Python with Pillow and run
+`python .\src\tools\Generate-StoreAssets.py`; `--check` compares the committed
+artwork with the generator output. Run
+`python .\src\tools\tests\StoreAssets.Tests.py` for scaling regression tests.
+
+See [Store preparation and release gates](doc/store/README.md) and the
+[deferred Hacker News submission plan](doc/store/hackernews-submission-plan.md).
+The proposed identities must be matched to Partner Center reservations before
+uploading. Switching from the old sideload identities is a one-time separate
+installation; automatic settings/credential migration is not implemented.
+
+## Deprecated signing notes
+
+The old Azure Trusted Signing and x64 package-collection path is retired.
+`Find-Msixs*.ps1` and `Sign-Msixs.ps1` have been removed. The
+[signing notebook](doc/signing-packages.ipynb) remains only as historical personal
+notes; do not use it for these Store identities. Existing Azure/GitHub signing
+resources have not been deleted and are no longer used by this workflow.
+
+## License, privacy, and support
+
+[MIT license](LICENSE) · [Privacy policy](PRIVACY.md) ·
+[Third-party notices](THIRD-PARTY-NOTICES.md) ·
+[Support/issues](https://github.com/zadjii/CmdPalExtensions/issues)
+
+## Mastodon home instance
 
 Open the Mastodon extension's settings in Command Palette (also available from
 the login, explore, and home commands) and set **Home instance** to your server's
@@ -80,7 +105,7 @@ Credentials are stored separately for each instance; existing mastodon.social
 logins continue to work. Logging out only removes the selected instance's login.
 
 Run the Mastodon instance regression tests with
-`dotnet test .\src\extensions\MastodonExtension.Tests\MastodonExtension.Tests.csproj -p:Platform=x64`.
+`dotnet test .\src\extensions\MastodonExtension.Tests\MastodonExtension.Tests.csproj -p:Platform=x64 -p:RestoreConfigFile="$PWD\.github\nuget.config"`.
 
 ## TMDB Search setup
 
@@ -104,12 +129,12 @@ API Read Access Token again.
 
 ## Contributing
 
-Want to help contribute an extension! Go for it! I'll pretty much accept PRs for anything at this point. 
+Contributions and regression tests are welcome.
 
 Run the TMDB regression tests on Windows with the .NET 9 SDK or later:
 
 ```powershell
-dotnet test .\src\extensions\TmdbExtension.Tests\TmdbExtension.Tests.csproj -p:Platform=x64
+dotnet test .\src\extensions\TmdbExtension.Tests\TmdbExtension.Tests.csproj -p:Platform=x64 -p:RestoreConfigFile="$PWD\.github\nuget.config"
 ```
 
 These tests use simulated HTTP responses; no TMDB account or API token is required.
