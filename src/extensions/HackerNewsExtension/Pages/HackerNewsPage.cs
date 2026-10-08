@@ -16,7 +16,6 @@ namespace HackerNewsExtension;
 internal sealed partial class HackerNewsPage : ListPage, IDisposable
 {
     private readonly HttpClient _httpClient = new();
-    private readonly JsonSerializerOptions _jsonOptions = new() { PropertyNameCaseInsensitive = true };
     public static readonly IconInfo HackerNewsIcon = new("https://news.ycombinator.com/favicon.ico");
     private static readonly IconInfo CommentsIcon = new("\uE8F2");
     private static readonly IconInfo PostIcon = new("\uE8A1");
@@ -56,7 +55,7 @@ internal sealed partial class HackerNewsPage : ListPage, IDisposable
         var topStoriesJson = await _httpClient.GetStringAsync(topStoriesUrl);
 
         // Deserialize the JSON array into a List of integers (story IDs)
-        var topStoryIds = JsonSerializer.Deserialize<List<int>>(topStoriesJson);
+        var topStoryIds = JsonSerializer.Deserialize(topStoriesJson, HackerNewsJsonContext.Default.ListInt32);
         var storiesToFetch = 25;
         for (var i = 0; i < Math.Min(storiesToFetch, topStoryIds.Count); i++)
         {
@@ -67,9 +66,9 @@ internal sealed partial class HackerNewsPage : ListPage, IDisposable
                 var storyJson = await _httpClient.GetStringAsync(storyUrl);
 
                 // Deserialize the JSON into our Story object.
-                // The option PropertyNameCaseInsensitive = true makes sure that
-                // properties like "descendants" and "score" are properly bound.
-                var story = JsonSerializer.Deserialize<NewsItem>(storyJson, _jsonOptions);
+                // HackerNewsJsonContext uses PropertyNameCaseInsensitive = true to make sure
+                // that properties like "descendants" and "score" are properly bound.
+                var story = JsonSerializer.Deserialize(storyJson, HackerNewsJsonContext.Default.NewsItem);
                 if (story != null)
                 {
                     var targetCommand = new OpenUrlCommand(story.Url) { Name = "Open", Result = CommandResult.Dismiss() };

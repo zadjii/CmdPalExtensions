@@ -23,8 +23,6 @@ internal sealed partial class MastodonExtensionPage : ListPage
 {
     public static readonly IconInfo MastodonIcon = new("https://mastodon.social/packs/media/icons/android-chrome-36x36-4c61fdb42936428af85afdbf8c6a45a8.png");
 
-    internal static readonly JsonSerializerOptions Options = new() { PropertyNameCaseInsensitive = true };
-
     private readonly List<ListItem> _items = [];
     private readonly StatusMessage _errorStatus = new() { State = MessageState.Error };
 
@@ -284,7 +282,7 @@ internal sealed partial class MastodonExtensionPage : ListPage
 
             // Read and deserialize the response JSON into a list of MastodonStatus objects
             var responseBody = response.Content;
-            statuses = JsonSerializer.Deserialize<List<MastodonStatus>>(responseBody, Options)
+            statuses = JsonSerializer.Deserialize(responseBody, MastodonJsonContext.Default.ListMastodonStatus)
                 ?? throw new JsonException("The Mastodon instance did not return a list of posts.");
             lock (_items)
             {
@@ -323,9 +321,9 @@ public partial class MastodonPostForm : FormContent
 
     public override string DataJson => $$"""
 {
-    "author_display_name": {{JsonSerializer.Serialize(post.Account.DisplayName)}},
-    "author_username": {{JsonSerializer.Serialize(post.Account.Username)}},
-    "post_content": {{JsonSerializer.Serialize(post.ContentAsMarkdown(false, false))}},
+    "author_display_name": {{JsonSerializer.Serialize(post.Account.DisplayName, MastodonJsonContext.Default.String)}},
+    "author_username": {{JsonSerializer.Serialize(post.Account.Username, MastodonJsonContext.Default.String)}},
+    "post_content": {{JsonSerializer.Serialize(post.ContentAsMarkdown(false, false), MastodonJsonContext.Default.String)}},
     "author_avatar_url": "{{post.Account.Avatar}}",
     "timestamp": "2017-02-14T06:08:39Z",
     "post_url": "{{post.Url}}"
@@ -452,7 +450,7 @@ public partial class MastodonPostPage : ContentPage
 
             // Read and deserialize the response JSON into a MastodonContext object
             var responseBody = response.Content;
-            var context = JsonSerializer.Deserialize<MastodonContext>(responseBody, MastodonExtensionPage.Options);
+            var context = JsonSerializer.Deserialize(responseBody, MastodonJsonContext.Default.MastodonContext);
 
             // Extract the list of replies (descendants)
             if (context?.Descendants != null)
@@ -624,7 +622,7 @@ public partial class MastodonLoginForm : FormContent
     "body": [
         {
             "type": "TextBlock",
-            "text": {{JsonSerializer.Serialize(e.Message)}},
+            "text": {{JsonSerializer.Serialize(e.Message, MastodonJsonContext.Default.String)}},
             "wrap": true
         }
     ]
@@ -652,7 +650,7 @@ public partial class MastodonLoginForm : FormContent
             "label": "Username",
             "isRequired": true,
             "errorMessage": "Username is required",
-            "text": {{JsonSerializer.Serialize($"Login to {_instance.Url} using the browser window, then copy and paste the authorization code into this page.")}},
+            "text": {{JsonSerializer.Serialize($"Login to {_instance.Url} using the browser window, then copy and paste the authorization code into this page.", MastodonJsonContext.Default.String)}},
             "wrap": true
         },
         {
@@ -668,7 +666,7 @@ public partial class MastodonLoginForm : FormContent
         {
             "type": "Action.OpenUrl",
             "title": "Open browser to login",
-            "url": {{JsonSerializer.Serialize(browserUrl)}}
+            "url": {{JsonSerializer.Serialize(browserUrl, MastodonJsonContext.Default.String)}}
         },
         {
             "type": "Action.Submit",

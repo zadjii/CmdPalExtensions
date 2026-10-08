@@ -7,6 +7,7 @@ using System.IO;
 using System.Net;
 using System.Net.Http;
 using System.Text.Json;
+using System.Text.Json.Serialization.Metadata;
 using System.Threading;
 using System.Threading.Tasks;
 using RestSharp;
@@ -35,7 +36,7 @@ internal sealed class TmdbClient
     {
         var request = new RestRequest("search/movie");
         request.AddQueryParameter("query", query);
-        var response = await GetAsync<MovieSearchResponse>(request, cancellationToken);
+        var response = await GetAsync(request, TmdbJsonContext.Default.MovieSearchResponse, cancellationToken);
         return response.Results ?? throw new InvalidDataException("TMDB returned no results collection.");
     }
 
@@ -43,10 +44,10 @@ internal sealed class TmdbClient
     {
         var request = new RestRequest($"movie/{movieId}");
         request.AddQueryParameter("append_to_response", "watch/providers");
-        return GetAsync<MovieDetailsResponse>(request, cancellationToken);
+        return GetAsync(request, TmdbJsonContext.Default.MovieDetailsResponse, cancellationToken);
     }
 
-    private async Task<T> GetAsync<T>(RestRequest request, CancellationToken cancellationToken)
+    private async Task<T> GetAsync<T>(RestRequest request, JsonTypeInfo<T> typeInfo, CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
         var token = _getToken().Trim();
@@ -77,7 +78,7 @@ internal sealed class TmdbClient
             throw new InvalidDataException("TMDB returned an empty response.");
         }
 
-        return JsonSerializer.Deserialize<T>(response.Content)
+        return JsonSerializer.Deserialize(response.Content, typeInfo)
             ?? throw new InvalidDataException("TMDB returned a null response.");
     }
 }

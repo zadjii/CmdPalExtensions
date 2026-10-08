@@ -65,7 +65,7 @@ public class EdgeFavoritesApi
             var jsonContent = File.ReadAllText(BookmarksPath(branding));
 
             // Deserialize the JSON into the Root object
-            var root = JsonSerializer.Deserialize<BookmarksRoot>(jsonContent);
+            var root = JsonSerializer.Deserialize(jsonContent, EdgeFavoritesJsonContext.Default.BookmarksRoot);
             return root;
         }
         catch (Exception ex)

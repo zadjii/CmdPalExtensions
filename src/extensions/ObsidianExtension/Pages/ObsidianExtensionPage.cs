@@ -183,7 +183,7 @@ public partial class EditNoteForm : FormContent
         _note = note;
         DataJson = $$"""
 {
-    "fileContent": {{JsonSerializer.Serialize(_note.NoteContent())}}
+    "fileContent": {{JsonSerializer.Serialize(_note.NoteContent(), ObsidianJsonContext.Default.String)}}
 }
 """;
 

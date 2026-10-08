@@ -150,7 +150,7 @@ public partial class ApiConfig
                 throw new InvalidOperationException($"Could not register the Mastodon extension on {session.Instance.Url}. Check the instance and try again.");
             }
 
-            var secrets = JsonSerializer.Deserialize<AppSecrets>(response.Content);
+            var secrets = JsonSerializer.Deserialize(response.Content, MastodonJsonContext.Default.AppSecrets);
             if (string.IsNullOrEmpty(secrets?.ClientId) || string.IsNullOrEmpty(secrets.ClientSecret))
             {
                 throw new InvalidOperationException("The Mastodon instance did not return application credentials.");
@@ -196,7 +196,7 @@ public partial class ApiConfig
             throw new InvalidOperationException($"Could not sign in to {session.Instance.Url}. Reopen the browser and try a new authorization code.");
         }
 
-        var token = JsonSerializer.Deserialize<UserAuthToken>(response.Content);
+        var token = JsonSerializer.Deserialize(response.Content, MastodonJsonContext.Default.UserAuthToken);
         if (string.IsNullOrEmpty(token?.AccessToken))
         {
             throw new InvalidOperationException("The Mastodon instance did not return an access token.");
