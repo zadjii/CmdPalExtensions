@@ -44,7 +44,7 @@ Store submissions do not need our former public-CA signature. Microsoft Store
 signs packages for distribution after approval. CI has no Azure authentication,
 signing job, Store upload, or automatic publishing step.
 
-On Windows, with the .NET 9 SDK and Windows SDK installed, run from the repo root:
+On Windows, with the .NET 10 SDK and Windows SDK installed, run from the repo root:
 
 ```powershell
 .\src\tools\tests\StoreReadiness.Tests.ps1
@@ -58,8 +58,7 @@ On Windows, with the .NET 9 SDK and Windows SDK installed, run from the repo roo
 
 Use fresh `artifacts\packages` and `artifacts\bundles` directories; scripts reject
 stale output rather than mixing old identities into submissions. `global.json`
-selects .NET 9, and `.github\nuget.config` uses public NuGet packages instead of the
-optional local SDK feed in the root configuration.
+selects .NET 10, and both NuGet configurations use public NuGet packages.
 
 Package and 300x300 Store listing icons are checked in. The existing Obsidian,
 TMDB, and WinUI Gallery artwork is reused without changing its colors or aspect
@@ -132,7 +131,7 @@ API Read Access Token again.
 
 Contributions and regression tests are welcome.
 
-Run the TMDB regression tests on Windows with the .NET 9 SDK or later:
+Run the TMDB regression tests on Windows with the .NET 10 SDK:
 
 ```powershell
 dotnet test .\src\extensions\TmdbExtension.Tests\TmdbExtension.Tests.csproj -p:Platform=x64 -p:RestoreConfigFile="$PWD\.github\nuget.config"

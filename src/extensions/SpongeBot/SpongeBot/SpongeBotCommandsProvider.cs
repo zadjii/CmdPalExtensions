@@ -33,7 +33,7 @@ internal sealed partial class FallbackSpongeTextItem : FallbackCommandItem
     public override ICommand? Command => _copyCommand;
 
     public FallbackSpongeTextItem()
-        : base(new NoOpCommand(), "Convert text to mOcKiNg CaSe")
+        : base("Convert text to mOcKiNg CaSe", "spongebot.alternatingCase")
     {
         Title = _copyCommand.Name = string.Empty;
         Icon = IconHelpers.FromRelativePath("Assets\\Package\\StoreLogo.scale-400.png");
