@@ -1,0 +1,101 @@
+{
+  "schemaVersion": 1,
+  "project": {
+    "repository": "<repository URL>",
+    "extension": "<extension name>",
+    "manifestPath": "<absolute manifest path>",
+    "authorizedStopPoint": "saved draft only"
+  },
+  "identity": {
+    "storeId": null,
+    "packageName": null,
+    "publisher": null,
+    "publisherDisplayName": null,
+    "packageFamilyName": null,
+    "verifiedAgainstBundle": false
+  },
+  "portal": {
+    "overviewUrl": null,
+    "submissionUrl": null,
+    "submissionId": null,
+    "sections": {},
+    "lastReadbackAt": null
+  },
+  "bundle": {
+    "path": null,
+    "version": null,
+    "sha256": null,
+    "sourceCommit": null,
+    "ciRunUrl": null,
+    "includedArchitectures": [],
+    "portalValidation": "not uploaded",
+    "desktopOnlyVerified": false,
+    "futureDeviceFamilies": null
+  },
+  "listing": {
+    "language": "<language code>",
+    "productName": "<reserved display name>",
+    "description": "<truthful description and PowerToys requirements>",
+    "releaseNotes": "",
+    "features": [],
+    "shortTitle": "",
+    "voiceTitle": "",
+    "shortDescription": "",
+    "keywords": [],
+    "copyright": "",
+    "additionalLicenseTerms": "",
+    "developedBy": "",
+    "screenshots": [
+      {
+        "path": "<original PNG path relative to this receipt or absolute>",
+        "caption": "<actual view, at most 200 characters>",
+        "sha256": "<SHA-256 of original PNG>",
+        "provenance": "<installed version, architecture, host version and capture method>"
+      }
+    ],
+    "storeLogo": {
+      "path": "<original 300x300 PNG path>",
+      "sha256": "<SHA-256 of original PNG>"
+    }
+  },
+  "properties": {
+    "category": null,
+    "privacyUrl": null,
+    "websiteUrl": null,
+    "supportUrl": null,
+    "personalInformationDeclaration": null,
+    "declarationRationale": null,
+    "rightsReviewedByOwner": false
+  },
+  "availability": {
+    "currency": null,
+    "basePrice": null,
+    "markets": [],
+    "futureMarkets": null,
+    "audience": null,
+    "discoverable": null,
+    "releaseSchedule": null,
+    "freeTrial": null
+  },
+  "ratings": {
+    "answersAndRationales": [],
+    "previewByAuthority": {},
+    "ownerConsent": "not completed",
+    "saved": false
+  },
+  "reviewerNotes": "",
+  "verification": {
+    "listingReopenedAndCompared": false,
+    "x64ExactPackageTest": "not run",
+    "arm64ExactPackageTest": "not run",
+    "wack": "not run",
+    "reports": []
+  },
+  "publication": {
+    "manualHoldVerified": false,
+    "submittedForCertification": false,
+    "published": false
+  },
+  "blockers": [],
+  "backupDirectory": null
+}

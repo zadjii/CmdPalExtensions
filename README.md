@@ -71,8 +71,9 @@ To regenerate, use Python with Pillow and run
 artwork with the generator output. Run
 `python .\src\tools\tests\StoreAssets.Tests.py` for scaling regression tests.
 
-See [Store preparation and release gates](doc/store/README.md) and the
-[deferred Hacker News submission plan](doc/store/hackernews-submission-plan.md).
+See [Store preparation and release gates](doc/store/README.md), the
+[Hacker News pilot plan](doc/store/hackernews-submission-plan.md), and the
+[reusable browser submission skill](.github/skills/cmdpal-store-browser/SKILL.md).
 The proposed identities must be matched to Partner Center reservations before
 uploading. Switching from the old sideload identities is a one-time separate
 installation; automatic settings/credential migration is not implemented.
