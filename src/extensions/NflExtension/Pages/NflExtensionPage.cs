@@ -19,7 +19,6 @@ namespace NflExtension;
 internal sealed partial class NflExtensionPage : ListPage, IDisposable
 {
     internal static readonly HttpClient Client = new();
-    internal static readonly JsonSerializerOptions Options = new() { PropertyNameCaseInsensitive = true };
     private Timer _timer;
     private List<ListItem> _lastItems;
 
@@ -248,7 +247,7 @@ internal sealed partial class NflExtensionPage : ListPage, IDisposable
             // Read and deserialize the response JSON into a list of MastodonStatus objects
             var responseBody = await response.Content.ReadAsStringAsync();
 
-            var data = JsonSerializer.Deserialize<NflData>(responseBody, Options);
+            var data = JsonSerializer.Deserialize(responseBody, NflJsonContext.Default.NflData);
 
             return data;
         }

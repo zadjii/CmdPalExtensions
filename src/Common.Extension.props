@@ -14,7 +14,14 @@
 
     <GenerateAppxPackageOnBuild Condition="'$(Configuration)'=='Release'">true</GenerateAppxPackageOnBuild>
 
+    <!--
+      Trim the self-contained .NET runtime and the Windows SDK projection out of the MSIX payload.
+      The MSIX tooling packages the .NET publish items, so this applies to `dotnet build` packaging too.
+      Trimming disables reflection-based System.Text.Json, so use source-generated JsonSerializerContexts.
+    -->
+    <PublishTrimmed>true</PublishTrimmed>
   </PropertyGroup>
+  <Import Project="$(MSBuildThisFileDirectory)Common.Dotnet.AotCompatibility.props" />
   <PropertyGroup Condition="'$(RuntimeIdentifier)' == '' and '$(Platform)' == 'x64'">
     <RuntimeIdentifier>win-x64</RuntimeIdentifier>
   </PropertyGroup>

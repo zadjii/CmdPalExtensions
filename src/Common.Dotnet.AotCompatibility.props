@@ -5,5 +5,10 @@
     <IsAotCompatible>true</IsAotCompatible>
     <CsWinRTAotOptimizerEnabled>true</CsWinRTAotOptimizerEnabled>
     <CsWinRTAotWarningLevel>2</CsWinRTAotWarningLevel>
+    <!--
+      IL2104: the Windows SDK projection and WinRT.Runtime ship with known trim warnings
+      (e.g. IL2081 in fallback code paths). Keep them visible without failing the build.
+    -->
+    <WarningsNotAsErrors>$(WarningsNotAsErrors);IL2081;IL2104</WarningsNotAsErrors>
   </PropertyGroup>
 </Project>

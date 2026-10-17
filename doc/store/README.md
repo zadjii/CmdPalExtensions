@@ -89,7 +89,12 @@ decision, not something the CI check can grant.
 
 Each app includes offline LICENSE, PRIVACY.md, and THIRD-PARTY-NOTICES.md.
 Packages are self-contained and retain assets/legal files as loose package
-content, rather than hiding them inside a single-file executable.
+content, rather than hiding them inside a single-file executable. The .NET
+runtime and Windows SDK projection are trimmed (`PublishTrimmed` in
+`src/Common.Extension.props`), which keeps each per-architecture package around
+10-12 MB. Trimming disables reflection-based `System.Text.Json`, so extensions
+must use source-generated `JsonSerializerContext` types; the trim analyzers
+fail the build if reflection-based serialization is reintroduced.
 
 ## Artwork
 

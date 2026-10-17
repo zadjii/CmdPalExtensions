@@ -6,7 +6,6 @@ using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
-using System.Reflection;
 using System.Text.Json;
 using System.Threading.Tasks;
 using Microsoft.CommandPalette.Extensions.Toolkit;
@@ -32,15 +31,6 @@ public class IconData
     public string TextGlyph => "&#x" + Code + ";";
 }
 
-// [System.Diagnostics.CodeAnalysis.SuppressMessage("StyleCop.CSharp.MaintainabilityRules", "SA1402:File may only contain a single type", Justification = "I like it")]
-// [JsonSourceGenerationOptions(PropertyNameCaseInsensitive = true)]
-// [JsonSerializable(typeof(List<IconData>))]
-// internal partial class IconDataListContext : JsonSerializerContext
-// {
-//    protected override JsonSerializerOptions? GeneratedSerializerOptions => throw new NotImplementedException();
-
-// public override JsonTypeInfo? GetTypeInfo(Type type) => throw new NotImplementedException();
-// }
 [System.Diagnostics.CodeAnalysis.SuppressMessage("StyleCop.CSharp.MaintainabilityRules", "SA1402:File may only contain a single type", Justification = "I like it")]
 internal sealed class IconsDataSource
 {
@@ -74,7 +64,7 @@ internal sealed class IconsDataSource
             if (icons.Count == 0 &&
                 !string.IsNullOrEmpty(jsonText))
             {
-                icons = JsonSerializer.Deserialize<List<IconData>>(jsonText) is List<IconData> i ? i
+                icons = JsonSerializer.Deserialize(jsonText, IconsJsonContext.Default.ListIconData) is List<IconData> i ? i
                     : throw new InvalidDataException($"Cannot load icon data: {jsonText}");
             }
 
@@ -88,10 +78,7 @@ internal sealed class IconsDataSource
     public static async Task<string> LoadText(string relativeFilePath)
     {
         // if the file exists, load it and append the new item
-        var sourcePath = Path.GetFullPath(
-            Path.Combine(
-                Path.GetDirectoryName(Assembly.GetEntryAssembly()!.Location)!,
-                relativeFilePath));
+        var sourcePath = Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, relativeFilePath));
 
         return File.Exists(sourcePath) ? await File.ReadAllTextAsync(sourcePath) : string.Empty;
     }
